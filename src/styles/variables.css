@@ -44,11 +44,11 @@
   --anim-duration-slow: 1.5s;
   --anim-duration-hero: 3s;
 
-  --font-logo: 'Cinzel', 'Noto Serif SC', serif;
-  --font-heading: 'Cormorant Garamond', 'Noto Serif SC', 'Songti SC', serif;
-  --font-body: 'Source Serif 4', 'Cormorant Garamond', 'Noto Serif SC', 'Songti SC', serif;
+  --font-logo: Georgia, 'LXGW WenKai', 'Noto Serif SC', serif;
+  --font-heading: Georgia, 'LXGW WenKai', 'Noto Serif SC', serif;
+  --font-body: 'Noto Serif SC', Georgia, 'Songti SC', serif;
   --font-cn: 'LXGW WenKai', 'Noto Serif SC', 'Songti SC', serif;
-  --font-sans: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: 'Noto Serif SC', Georgia, -apple-system, BlinkMacSystemFont, sans-serif;
 
   --container-max: 1200px;
   --container-narrow: 640px;
