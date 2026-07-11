@@ -1,2 +1,7 @@
-# rouzhen-website
-official website of ROUZHEN. Between Cloud &amp; Moss
+# ROUZHEN
+
+Official website of ROUZHEN.
+
+Currently under active development.
+
+Https://rouzhen.page.dev
