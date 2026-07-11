@@ -1,0 +1,140 @@
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 1000;
+  transition: var(--transition-base);
+  background: transparent;
+}
+
+.header.scrolled {
+  background: rgba(0, 0, 0, 0.92);
+  backdrop-filter: blur(10px);
+}
+
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-5) var(--space-6);
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.nav-logo {
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 1s ease-out;
+}
+
+.header.scrolled .nav-logo {
+  opacity: 1;
+}
+
+.nav-logo-img {
+  filter: brightness(0) invert(1);
+  opacity: 0.9;
+  width: 100px;
+  height: auto;
+}
+
+.nav-menu {
+  display: flex;
+  list-style: none;
+  gap: var(--space-6);
+  opacity: 0;
+  transition: opacity 1s ease-out;
+}
+
+.header.scrolled .nav-menu {
+  opacity: 1;
+}
+
+.nav-link {
+  color: var(--color-text-light);
+  text-decoration: none;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  letter-spacing: 0.15em;
+  position: relative;
+  transition: var(--transition-base);
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: var(--color-text-light);
+  transition: var(--transition-base);
+}
+
+.nav-link:hover::after {
+  width: 100%;
+}
+
+.menu-toggle {
+  display: none;
+  flex-direction: column;
+  gap: 5px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 1s ease-out;
+}
+
+.header.scrolled .menu-toggle {
+  opacity: 1;
+}
+
+.menu-toggle span {
+  width: 25px;
+  height: 1px;
+  background: var(--color-text-light);
+  transition: var(--transition-base);
+}
+
+@media (max-width: 900px) {
+  .nav-menu {
+    position: fixed;
+    top: 70px;
+    left: -100%;
+    width: 100%;
+    height: calc(100vh - 70px);
+    background: rgba(0, 0, 0, 0.95);
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: var(--space-6);
+    transition: var(--transition-base);
+  }
+
+  .nav-menu.active {
+    left: 0;
+  }
+
+  .menu-toggle {
+    display: flex;
+  }
+
+  .menu-toggle.active span:nth-child(1) {
+    transform: rotate(-45deg) translate(-5px, 6px);
+  }
+  .menu-toggle.active span:nth-child(2) {
+    opacity: 0;
+  }
+  .menu-toggle.active span:nth-child(3) {
+    transform: rotate(45deg) translate(-5px, -6px);
+  }
+}
+
+@media (max-width: 600px) {
+  .navbar {
+    padding: var(--space-3) var(--space-5);
+  }
+}

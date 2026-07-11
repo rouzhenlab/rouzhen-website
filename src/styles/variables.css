@@ -1,0 +1,55 @@
+:root {
+  --color-cloud: #e8ecef;
+  --color-moss: #6b7c5e;
+  --color-moss-light: #8a9a7c;
+  --color-moss-dark: #4d5a42;
+  --color-stone: #2d2d2d;
+  --color-stone-light: #555555;
+  --color-mist: rgba(255, 255, 255, 0.6);
+  --color-ink: #1a1a1a;
+  --color-paper: #ffffff;
+  --color-paper-warm: #f7f6f3;
+  --color-border: #ececea;
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #666666;
+  --color-text-muted: #999999;
+  --color-text-light: #ffffff;
+  --color-text-light-muted: rgba(255, 255, 255, 0.6);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 32px;
+  --space-6: 48px;
+  --space-7: 64px;
+  --space-8: 96px;
+  --space-9: 128px;
+  --space-10: 160px;
+
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.08);
+
+  --transition-fast: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 1s cubic-bezier(0.4, 0, 0.2, 1);
+
+  --anim-duration-fast: 0.6s;
+  --anim-duration-base: 1s;
+  --anim-duration-slow: 1.5s;
+  --anim-duration-hero: 3s;
+
+  --font-logo: 'Cinzel', 'Noto Serif SC', serif;
+  --font-heading: 'Cormorant Garamond', 'Noto Serif SC', 'Songti SC', serif;
+  --font-body: 'Source Serif 4', 'Cormorant Garamond', 'Noto Serif SC', 'Songti SC', serif;
+  --font-cn: 'LXGW WenKai', 'Noto Serif SC', 'Songti SC', serif;
+  --font-sans: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --container-max: 1200px;
+  --container-narrow: 640px;
+}
