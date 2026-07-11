@@ -1,0 +1,74 @@
+.story {
+  padding: var(--space-9) 0;
+  background: var(--color-paper-warm);
+}
+
+.story-content {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: var(--space-9);
+  align-items: center;
+}
+
+.story-text p {
+  font-size: 16px;
+  color: var(--color-text-secondary);
+  line-height: 2.2;
+  letter-spacing: 0.03em;
+  margin-bottom: var(--space-2);
+}
+
+.story-emphasis {
+  font-family: var(--font-heading);
+  font-style: italic;
+  font-size: 18px;
+  color: var(--color-text-primary);
+  letter-spacing: 0.05em;
+  margin: var(--space-5) 0 !important;
+}
+
+.story-image {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.story-image-1 {
+  height: 340px;
+  background-image: url('../../assets/images/hero-bg.jpg');
+  background-size: cover;
+  background-position: center;
+}
+
+.story-image-2 {
+  height: 220px;
+  margin-left: var(--space-8);
+  background-image: url('https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=close%20up%20green%20moss%20on%20stone%20macro%20zen%20nature%20calm%20muted%20tones%20soft%20light&image_size=landscape_4_3');
+  background-size: cover;
+  background-position: center;
+}
+
+@media (max-width: 900px) {
+  .story-content {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+  }
+
+  .story-image-2 {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .story {
+    padding: var(--space-7) 0;
+  }
+
+  .story-image-1 {
+    height: 240px;
+  }
+
+  .story-image-2 {
+    height: 180px;
+  }
+}
