@@ -3,6 +3,55 @@ document.addEventListener('DOMContentLoaded', () => {
   const navMenu = document.getElementById('navMenu');
   const menuToggle = document.getElementById('menuToggle');
   const navLinks = document.querySelectorAll('.nav-link');
+  const langBtns = document.querySelectorAll('.lang-btn');
+
+  function setLanguage(lang) {
+    const elements = document.querySelectorAll('[data-en][data-cn]');
+    elements.forEach(el => {
+      el.textContent = el.getAttribute('data-' + lang);
+    });
+
+    langBtns.forEach(btn => {
+      if (btn.getAttribute('data-lang') === lang) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+
+    document.body.classList.remove('lang-en', 'lang-cn');
+    document.body.classList.add('lang-' + lang);
+
+    try {
+      localStorage.setItem('rouzhen-lang', lang);
+    } catch (e) {}
+  }
+
+  langBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const lang = btn.getAttribute('data-lang');
+      setLanguage(lang);
+    });
+  });
+
+  function detectLanguage() {
+    const zhLangCodes = ['zh-CN', 'zh-SG', 'zh', 'zh-Hans'];
+    const browserLang = navigator.language || navigator.userLanguage || 'en';
+    return zhLangCodes.some(code => browserLang.startsWith(code)) ? 'cn' : 'en';
+  }
+
+  try {
+    const savedLang = localStorage.getItem('rouzhen-lang');
+    if (savedLang) {
+      setLanguage(savedLang);
+    } else {
+      const detectedLang = detectLanguage();
+      setLanguage(detectedLang);
+    }
+  } catch (e) {
+    const detectedLang = detectLanguage();
+    setLanguage(detectedLang);
+  }
 
   window.addEventListener('scroll', () => {
     if (window.scrollY > 50) {

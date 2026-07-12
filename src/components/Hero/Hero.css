@@ -202,6 +202,21 @@
   filter: brightness(0) invert(1);
 }
 
+.logo-cn {
+  display: none;
+  width: auto;
+  height: 120px;
+  max-height: 25vh;
+}
+
+body.lang-cn .logo-en {
+  display: none;
+}
+
+body.lang-cn .logo-cn {
+  display: block;
+}
+
 .hero-bottom {
   position: absolute;
   bottom: var(--space-4);
@@ -218,18 +233,64 @@
 .hero-slogan {
   opacity: 0;
   text-align: center;
-  animation: sloganFadeIn 1s ease-out 9s forwards;
+  animation: sloganFadeIn 1.2s ease-out 10s forwards;
 }
 
-.slogan-img {
-  width: 448px;
-  max-width: 90vw;
-  filter: brightness(0) invert(1);
-  display: block;
+.slogan-text {
+  font-family: var(--font-slogan);
+  font-size: 20px;
+  font-weight: 400;
+  letter-spacing: 0.35em;
+  color: var(--color-text-light);
+  margin: 0;
+  text-transform: none;
+  opacity: 0.9;
 }
 
 @keyframes sloganFadeIn {
-  to { opacity: 1; }
+  0%   { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.lang-selector {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  opacity: 0;
+  margin-top: 16px;
+  animation: langFadeIn 1s ease-out 10.5s forwards;
+}
+
+.lang-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-light-muted);
+  font-family: var(--font-slogan);
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: color 0.3s ease;
+  font-weight: 400;
+}
+
+.lang-btn:hover {
+  color: var(--color-text-light);
+}
+
+.lang-btn.active {
+  color: var(--color-text-light);
+}
+
+.lang-divider {
+  color: var(--color-text-light-muted);
+  font-size: 12px;
+  opacity: 0.5;
+}
+
+@keyframes langFadeIn {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
 }
 
 @keyframes gentleFadeIn {
@@ -239,7 +300,7 @@
 
 .scroll-indicator {
   opacity: 0;
-  animation: fadeInLate 1s ease-out 10s forwards, bounce 2s 10s infinite;
+  animation: fadeInLate 1s ease-out 11s forwards, bounce 2s 11s infinite;
 }
 
 .scroll-indicator span {
@@ -261,7 +322,8 @@
 
 @media (max-width: 600px) {
   .logo-img { width: 240px; }
-  .slogan-img { width: 360px; max-width: 90vw; }
+  .logo-cn { height: 90px; }
+  .slogan-text { font-size: 14px; letter-spacing: 0.3em; }
 }
 
 @media screen and (orientation: landscape) and (max-width: 900px) {
@@ -270,5 +332,6 @@
     height: 100svh;
   }
   .logo-img { width: 280px; max-width: 60vw; }
-  .slogan-img { width: 400px; max-width: 80vw; }
+  .logo-cn { height: 100px; max-height: 20vh; }
+  .slogan-text { font-size: 16px; letter-spacing: 0.3em; }
 }

@@ -49,6 +49,9 @@
   --font-body: 'Noto Serif SC', Georgia, 'Songti SC', serif;
   --font-cn: 'LXGW WenKai', 'Noto Serif SC', 'Songti SC', serif;
   --font-sans: 'Noto Serif SC', Georgia, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-slogan: 'Cinzel', Georgia, serif;
+  --font-cn-heading: 'LXGW WenKai', 'Noto Serif SC', 'Songti SC', serif;
+  --font-cn-body: 'Noto Serif SC', 'LXGW WenKai', 'Songti SC', serif;
 
   --container-max: 1200px;
   --container-narrow: 640px;

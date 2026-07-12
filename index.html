@@ -37,15 +37,15 @@
   <header class="header" id="header">
     <nav class="navbar">
       <div class="nav-logo">
-        <img src="src/assets/svg/logo.svg" alt="ROUZHEN" class="nav-logo-img">
+        <span class="nav-wave">~</span>
       </div>
       <ul class="nav-menu" id="navMenu">
-        <li><a href="#home" class="nav-link">Home</a></li>
-        <li><a href="#philosophy" class="nav-link">Philosophy</a></li>
-        <li><a href="#story" class="nav-link">Story</a></li>
-        <li><a href="#collections" class="nav-link">Collections</a></li>
-        <li><a href="#lab" class="nav-link">Lab</a></li>
-        <li><a href="#contact" class="nav-link">Contact</a></li>
+        <li><a href="#home" class="nav-link" data-en="Home" data-cn="首页">Home</a></li>
+        <li><a href="#philosophy" class="nav-link" data-en="Philosophy" data-cn="理念">Philosophy</a></li>
+        <li><a href="#story" class="nav-link" data-en="Story" data-cn="故事">Story</a></li>
+        <li><a href="#collections" class="nav-link" data-en="Collections" data-cn="系列">Collections</a></li>
+        <li><a href="#lab" class="nav-link" data-en="Lab" data-cn="实验室">Lab</a></li>
+        <li><a href="#contact" class="nav-link" data-en="Contact" data-cn="联系">Contact</a></li>
       </ul>
       <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
         <span></span>
@@ -71,13 +71,19 @@
 
     <div class="hero-content">
       <div class="reveal-logo">
-        <img src="src/assets/svg/logo.svg" alt="ROUZHEN" class="logo-img">
+        <img src="src/assets/svg/logo.svg" alt="ROUZHEN" class="logo-img logo-en">
+        <img src="src/assets/svg/logo3.svg" alt="柔眞" class="logo-img logo-cn">
       </div>
     </div>
 
     <div class="hero-bottom">
       <div class="hero-slogan">
-        <img src="src/assets/svg/slogan.svg" alt="Between Cloud & Moss" class="slogan-img">
+        <p class="slogan-text" data-en="Between Cloud & Moss" data-cn="云～苔　之　间">Between Cloud & Moss</p>
+      </div>
+      <div class="lang-selector">
+        <button class="lang-btn active" data-lang="en">EN</button>
+        <span class="lang-divider">/</span>
+        <button class="lang-btn" data-lang="cn">中文</button>
       </div>
       <div class="scroll-indicator">
         <span></span>
@@ -88,24 +94,24 @@
   <section class="philosophy" id="philosophy">
     <div class="container">
       <div class="philosophy-intro">
-        <p>Every mountain has its own breath.</p>
-        <p>Every stone carries the memory of time.</p>
-        <p>Every moss landscape quietly grows with life.</p>
-        <p class="philosophy-intro-tag">ROUZHEN creates miniature natural worlds for modern spaces.</p>
+        <p data-en="Every mountain has its own breath." data-cn="每一座山，都有自己的呼吸。">Every mountain has its own breath.</p>
+        <p data-en="Every stone carries the memory of time." data-cn="每一块石，都记载着时间。">Every stone carries the memory of time.</p>
+        <p data-en="Every moss landscape quietly grows with life." data-cn="每一方苔，都静静生长。">Every moss landscape quietly grows with life.</p>
+        <p class="philosophy-intro-tag" data-en="ROUZHEN creates miniature natural worlds for modern spaces." data-cn="让自然，在日常中安静生长。">ROUZHEN creates miniature natural worlds for modern spaces.</p>
       </div>
 
       <div class="section-header">
-        <h2 class="section-title">Our Philosophy</h2>
-        <p class="section-subtitle">Nature, respected</p>
+        <h2 class="section-title" data-en="Our Philosophy" data-cn="我们的理念">Our Philosophy</h2>
+        <p class="section-subtitle" data-en="Nature, respected" data-cn="敬畏自然">Nature, respected</p>
       </div>
 
       <div class="philosophy-text">
-        <p>We believe nature should not be copied.</p>
-        <p>It should be respected.</p>
-        <p>A mountain is not decoration.</p>
-        <p>A moss landscape is not an ornament.</p>
-        <p class="philosophy-emphasis">It is a living world.</p>
-        <p>ROUZHEN exists to reconnect people with the quiet rhythm of nature.</p>
+        <p data-en="We believe nature should not be copied." data-cn="我们相信，自然不应被复制。">We believe nature should not be copied.</p>
+        <p data-en="It should be respected." data-cn="自然，应当被敬畏。">It should be respected.</p>
+        <p data-en="A mountain is not decoration." data-cn="山，不是装饰。">A mountain is not decoration.</p>
+        <p data-en="A moss landscape is not an ornament." data-cn="苔，不是摆设。">A moss landscape is not an ornament.</p>
+        <p class="philosophy-emphasis" data-en="It is a living world." data-cn="它，本就是生命。">It is a living world.</p>
+        <p data-en="ROUZHEN exists to reconnect people with the quiet rhythm of nature." data-cn="让人与自然，再次相遇。">ROUZHEN exists to reconnect people with the quiet rhythm of nature.</p>
       </div>
     </div>
   </section>
@@ -113,20 +119,20 @@
   <section class="story" id="story">
     <div class="container">
       <div class="section-header">
-        <h2 class="section-title">Why ROUZHEN</h2>
-        <p class="section-subtitle">Brand Story</p>
+        <h2 class="section-title" data-en="Why ROUZHEN" data-cn="为何 柔眞">Why ROUZHEN</h2>
+        <p class="section-subtitle" data-en="Brand Story" data-cn="品牌故事">Brand Story</p>
       </div>
 
       <div class="story-content">
         <div class="story-text">
-          <p>In a fast-moving world, we began to notice the smallest things.</p>
-          <p>A stone.</p>
-          <p>A piece of moss.</p>
-          <p>Morning mist.</p>
-          <p>Cloud drifting through a valley.</p>
-          <p class="story-emphasis">Those quiet moments inspired ROUZHEN.</p>
-          <p>Our work is not about making products.</p>
-          <p>It is about preserving the feeling of nature in everyday life.</p>
+          <p data-en="In a fast-moving world, we began to notice the smallest things." data-cn="世界越来越快，我们却慢了下来。">In a fast-moving world, we began to notice the smallest things.</p>
+          <p data-en="A stone." data-cn="一块石。">A stone.</p>
+          <p data-en="A piece of moss." data-cn="一片苔。">A piece of moss.</p>
+          <p data-en="Morning mist." data-cn="清晨的雾。">Morning mist.</p>
+          <p data-en="Cloud drifting through a valley." data-cn="越过山谷的云。">Cloud drifting through a valley.</p>
+          <p class="story-emphasis" data-en="Those quiet moments inspired ROUZHEN." data-cn="那些静默的时刻，孕育了 柔眞。">Those quiet moments inspired ROUZHEN.</p>
+          <p data-en="Our work is not about making products." data-cn="我们创造的，不只是作品。">Our work is not about making products.</p>
+          <p data-en="It is about preserving the feeling of nature in everyday life." data-cn="更是一种与自然相处的方式。">It is about preserving the feeling of nature in everyday life.</p>
         </div>
         <div class="story-image">
           <div class="story-image-1"></div>
@@ -139,30 +145,30 @@
   <section class="values" id="values">
     <div class="container">
       <div class="section-header">
-        <h2 class="section-title">Our Values</h2>
-        <p class="section-subtitle">What we stand for</p>
+        <h2 class="section-title" data-en="Our Values" data-cn="我们的价值">Our Values</h2>
+        <p class="section-subtitle" data-en="What we stand for" data-cn="我们所坚持的">What we stand for</p>
       </div>
 
       <div class="values-grid">
         <div class="value-card">
           <span class="value-number">01</span>
-          <h3 class="value-name">Respect Life</h3>
-          <p class="value-desc">Every living element deserves care.</p>
+          <h3 class="value-name" data-en="Respect Life" data-cn="敬畏生命">Respect Life</h3>
+          <p class="value-desc" data-en="Every living element deserves care." data-cn="每一个生命，都值得被善待。">Every living element deserves care.</p>
         </div>
         <div class="value-card">
           <span class="value-number">02</span>
-          <h3 class="value-name">Scientific Truth</h3>
-          <p class="value-desc">Every design begins with observation and experimentation.</p>
+          <h3 class="value-name" data-en="Scientific Truth" data-cn="科学求真">Scientific Truth</h3>
+          <p class="value-desc" data-en="Every design begins with observation and experimentation." data-cn="每一次设计，都始于观察与实验。">Every design begins with observation and experimentation.</p>
         </div>
         <div class="value-card">
           <span class="value-number">03</span>
-          <h3 class="value-name">Natural Beauty</h3>
-          <p class="value-desc">Beauty comes from nature itself.</p>
+          <h3 class="value-name" data-en="Natural Beauty" data-cn="自然之美">Natural Beauty</h3>
+          <p class="value-desc" data-en="Beauty comes from nature itself." data-cn="美，源自自然本身。">Beauty comes from nature itself.</p>
         </div>
         <div class="value-card">
           <span class="value-number">04</span>
-          <h3 class="value-name">Long-term Thinking</h3>
-          <p class="value-desc">We create products that grow with time.</p>
+          <h3 class="value-name" data-en="Long-term Thinking" data-cn="长远思维">Long-term Thinking</h3>
+          <p class="value-desc" data-en="We create products that grow with time." data-cn="我们创造的，是随时间生长的作品。">We create products that grow with time.</p>
         </div>
       </div>
     </div>
@@ -171,32 +177,32 @@
   <section class="collections" id="collections">
     <div class="container">
       <div class="section-header">
-        <h2 class="section-title">Collections</h2>
-        <p class="section-subtitle">Three worlds, one nature</p>
+        <h2 class="section-title" data-en="Collections" data-cn="系列作品">Collections</h2>
+        <p class="section-subtitle" data-en="Three worlds, one nature" data-cn="三个世界，一种自然">Three worlds, one nature</p>
       </div>
 
       <div class="collections-grid">
         <div class="collection-card">
           <div class="collection-image collection-image-cloud"></div>
           <div class="collection-info">
-            <h3 class="collection-name">Cloud Collection</h3>
-            <p class="collection-desc">Inspired by morning mist and mountain valleys. Focus on flowing clouds and quiet atmosphere.</p>
+            <h3 class="collection-name" data-en="Cloud Collection" data-cn="云系列">Cloud Collection</h3>
+            <p class="collection-desc" data-en="Inspired by morning mist and mountain valleys. Focus on flowing clouds and quiet atmosphere." data-cn="灵感源于晨雾与山谷。专注于流动的云与静谧的氛围。">Inspired by morning mist and mountain valleys. Focus on flowing clouds and quiet atmosphere.</p>
           </div>
         </div>
 
         <div class="collection-card">
           <div class="collection-image collection-image-moss"></div>
           <div class="collection-info">
-            <h3 class="collection-name">Moss Collection</h3>
-            <p class="collection-desc">Living moss landscapes. Tiny ecosystems for everyday life.</p>
+            <h3 class="collection-name" data-en="Moss Collection" data-cn="苔藓系列">Moss Collection</h3>
+            <p class="collection-desc" data-en="Living moss landscapes. Tiny ecosystems for everyday life." data-cn="活着的苔藓景观。为日常而生的微型生态系统。">Living moss landscapes. Tiny ecosystems for everyday life.</p>
           </div>
         </div>
 
         <div class="collection-card">
           <div class="collection-image collection-image-stone"></div>
           <div class="collection-info">
-            <h3 class="collection-name">Stone Collection</h3>
-            <p class="collection-desc">Natural rocks and miniature mountains. Simple forms. Timeless beauty.</p>
+            <h3 class="collection-name" data-en="Stone Collection" data-cn="山石系列">Stone Collection</h3>
+            <p class="collection-desc" data-en="Natural rocks and miniature mountains. Simple forms. Timeless beauty." data-cn="天然岩石与微型山川。朴素的形态。永恒的美。">Natural rocks and miniature mountains. Simple forms. Timeless beauty.</p>
           </div>
         </div>
       </div>
@@ -206,26 +212,26 @@
   <section class="lab" id="lab">
     <div class="container">
       <div class="section-header">
-        <h2 class="section-title">Research & Experiment</h2>
-        <p class="section-subtitle">The Laboratory</p>
+        <h2 class="section-title" data-en="Research & Experiment" data-cn="研究与实验">Research & Experiment</h2>
+        <p class="section-subtitle" data-en="The Laboratory" data-cn="实验室">The Laboratory</p>
       </div>
 
       <div class="lab-content">
         <div class="lab-text">
-          <p>Every product begins in the laboratory.</p>
-          <p>We study fog.</p>
-          <p>Water.</p>
-          <p>Ceramics.</p>
-          <p>Stone.</p>
-          <p>Plant growth.</p>
-          <p class="lab-emphasis">Because beauty should also be scientifically understood.</p>
+          <p data-en="Every product begins in the laboratory." data-cn="每一件作品，都始于一次观察。">Every product begins in the laboratory.</p>
+          <p data-en="We study fog." data-cn="我们研究雾。">We study fog.</p>
+          <p data-en="Water." data-cn="水。">Water.</p>
+          <p data-en="Ceramics." data-cn="陶土。">Ceramics.</p>
+          <p data-en="Stone." data-cn="石。">Stone.</p>
+          <p data-en="Plant growth." data-cn="植物生长。">Plant growth.</p>
+          <p class="lab-emphasis" data-en="Because beauty should also be scientifically understood." data-cn="因为真正的美，经得起科学验证。">Because beauty should also be scientifically understood.</p>
         </div>
         <div class="lab-tags">
-          <span class="lab-tag">Fog</span>
-          <span class="lab-tag">Water</span>
-          <span class="lab-tag">Ceramics</span>
-          <span class="lab-tag">Stone</span>
-          <span class="lab-tag">Plant Growth</span>
+          <span class="lab-tag" data-en="Fog" data-cn="雾">Fog</span>
+          <span class="lab-tag" data-en="Water" data-cn="水">Water</span>
+          <span class="lab-tag" data-en="Ceramics" data-cn="陶土">Ceramics</span>
+          <span class="lab-tag" data-en="Stone" data-cn="石">Stone</span>
+          <span class="lab-tag" data-en="Plant Growth" data-cn="植物生长">Plant Growth</span>
         </div>
       </div>
     </div>
@@ -234,21 +240,18 @@
   <section class="contact" id="contact">
     <div class="container">
       <div class="section-header text-center">
-        <h2 class="section-title">Contact</h2>
-        <p class="section-subtitle">We welcome you</p>
+        <h2 class="section-title" data-en="Contact" data-cn="联系我们">Contact</h2>
+        <p class="section-subtitle" data-en="We welcome you" data-cn="欢迎您">We welcome you</p>
       </div>
 
       <div class="contact-intro">
-        <p>We welcome artists,</p>
-        <p>designers,</p>
-        <p>nature lovers,</p>
-        <p>and partners</p>
-        <p>who share the same appreciation for nature.</p>
+        <p data-en="If you love nature," data-cn="如果你也热爱自然，">If you love nature,</p>
+        <p data-en="we welcome you to walk with us." data-cn="欢迎与我们同行。">we welcome you to walk with us.</p>
       </div>
 
       <div class="contact-channels">
         <a href="mailto:hello@rouzhen.com" class="contact-channel">
-          <span class="channel-label">Email</span>
+          <span class="channel-label" data-en="Email" data-cn="邮箱">Email</span>
           <span class="channel-value">hello@rouzhen.com</span>
         </a>
         <a href="#" class="contact-channel">
@@ -256,7 +259,7 @@
           <span class="channel-value">@rouzhen</span>
         </a>
         <a href="#" class="contact-channel">
-          <span class="channel-label">Xiaohongshu</span>
+          <span class="channel-label" data-en="Xiaohongshu" data-cn="小红书">Xiaohongshu</span>
           <span class="channel-value">ROUZHEN</span>
         </a>
       </div>
@@ -267,15 +270,15 @@
     <div class="container">
       <div class="footer-content">
         <div class="footer-logo">
-          <img src="src/assets/svg/logo.svg" alt="ROUZHEN" class="footer-logo-img">
+          <span class="footer-wave">~</span>
         </div>
         <div class="footer-links">
-          <a href="#home">Home</a>
-          <a href="#philosophy">Philosophy</a>
-          <a href="#story">Story</a>
-          <a href="#collections">Collections</a>
-          <a href="#lab">Lab</a>
-          <a href="#contact">Contact</a>
+          <a href="#home" data-en="Home" data-cn="首页">Home</a>
+          <a href="#philosophy" data-en="Philosophy" data-cn="理念">Philosophy</a>
+          <a href="#story" data-en="Story" data-cn="故事">Story</a>
+          <a href="#collections" data-en="Collections" data-cn="系列">Collections</a>
+          <a href="#lab" data-en="Lab" data-cn="实验室">Lab</a>
+          <a href="#contact" data-en="Contact" data-cn="联系">Contact</a>
         </div>
         <div class="footer-social">
           <a href="mailto:hello@rouzhen.com" class="social-link" aria-label="Email">
@@ -294,7 +297,7 @@
         </div>
       </div>
       <div class="footer-copyright">
-        <p>&copy; 2026 ROUZHEN. Between Cloud & Moss.</p>
+        <p data-en="&copy; 2026 ROUZHEN. Between Cloud & Moss." data-cn="&copy; 2026 ROUZHEN. Between Cloud & Moss.">&copy; 2026 ROUZHEN. Between Cloud & Moss.</p>
       </div>
     </div>
   </footer>

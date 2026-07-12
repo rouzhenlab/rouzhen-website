@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=LXGW+WenKai:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=LXGW+WenKai:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@300;400;500;600;700&display=swap');
 
 html { font-size: 16px; }
 
@@ -74,4 +74,41 @@ p {
   h1 { font-size: 32px; }
   h2 { font-size: 24px; }
   p { font-size: 15px; }
+}
+
+.lang-cn h1,
+.lang-cn h2,
+.lang-cn h3,
+.lang-cn h4,
+.lang-cn h5,
+.lang-cn h6 {
+  font-family: var(--font-cn-heading);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+}
+
+.lang-cn p {
+  font-family: var(--font-cn-body);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+
+.lang-cn .nav-link,
+.lang-cn .footer-links a,
+.lang-cn .section-subtitle,
+.lang-cn .channel-label,
+.lang-cn .lang-btn {
+  font-family: var(--font-cn-heading);
+  font-weight: 400;
+}
+
+.lang-cn .philosophy-intro-tag,
+.lang-cn .story-emphasis,
+.lang-cn .philosophy-emphasis,
+.lang-cn .lab-emphasis,
+.lang-cn .value-name,
+.lang-cn .collection-name,
+.lang-cn .lab-tag {
+  font-family: var(--font-cn-heading);
+  font-weight: 500;
 }
