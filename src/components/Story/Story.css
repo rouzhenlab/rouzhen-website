@@ -43,7 +43,7 @@
 .story-image-2 {
   height: 220px;
   margin-left: var(--space-8);
-  background-image: url('https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=close%20up%20green%20moss%20on%20stone%20macro%20zen%20nature%20calm%20muted%20tones%20soft%20light&image_size=landscape_4_3');
+  background-image: url('https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=transparent%20glass%20rectangular%20bowl%20with%20dark%20grey%20natural%20rock%20miniature%20mountain%20landscape%20covered%20in%20lush%20green%20moss%20traditional%20chinese%20study%20room%20background%20wooden%20furniture%20zen%20minimal%20elegant&image_size=landscape_4_3');
   background-size: cover;
   background-position: center;
 }
