@@ -1,0 +1,49 @@
+# Journal Entries Directory
+
+This directory is reserved for journal entry files.
+
+## Structure
+
+Each entry can be stored as:
+- `entry-slug.html` - Static HTML entry (current approach)
+- `entry-slug.md` - Markdown entry (future support)
+
+## Naming Convention
+
+Use lowercase with hyphens:
+- `2026-07-13-first-moss-collection.html`
+- `the-philosophy-of-stones.md`
+
+## Entry Format (HTML)
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Entry Title — ROUZHEN Journal</title>
+  <!-- Shared styles -->
+</head>
+<body>
+  <article class="entry">
+    <header class="entry-header">
+      <time datetime="2026-07-13">2026.07.13</time>
+      <h1>Entry Title</h1>
+    </header>
+    <div class="entry-content">
+      <!-- Entry content -->
+    </div>
+    <footer class="entry-footer">
+      <!-- Tags, navigation -->
+    </footer>
+  </article>
+</body>
+</html>
+```
+
+## Future: Markdown Support
+
+Planned workflow:
+1. Write in Markdown
+2. Build process converts to HTML
+3. Metadata stored in data/entries.json

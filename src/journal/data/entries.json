@@ -1,0 +1,29 @@
+{
+  "entries": [
+    {
+      "id": "example-entry",
+      "title": "Example Entry",
+      "slug": "example-entry",
+      "date": "2026-07-13",
+      "excerpt": "This is an example entry for future reference.",
+      "tags": ["example"],
+      "lang": {
+        "en": {
+          "title": "Example Entry",
+          "excerpt": "This is an example entry for future reference."
+        },
+        "cn": {
+          "title": "示例文章",
+          "excerpt": "这是一篇示例文章，供未来参考。"
+        }
+      },
+      "published": false
+    }
+  ],
+  "meta": {
+    "version": "1.0",
+    "lastUpdated": "2026-07-13",
+    "description": "ROUZHEN Journal entries index",
+    "note": "This file will be used for dynamic entry loading in the future"
+  }
+}

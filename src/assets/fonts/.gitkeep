@@ -1,0 +1,11 @@
+# ROUZHEN Font Assets
+#
+# 品牌字体文件目录
+#
+# 用途：
+# - 存放本地字体文件（如有授权）
+# - 作为 Google Fonts 的备选加载方案
+#
+# 注意：
+# - 当前使用 Google Fonts CDN
+# - 未来如需本地化字体，文件放此目录

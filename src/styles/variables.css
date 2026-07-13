@@ -1,31 +1,59 @@
 :root {
+  /* ========================================
+   * ROUZHEN Brand Colors
+   * 
+   * 品牌色彩系统
+   * 
+   * 核心色：Cloud（云）、Moss（苔藓）、Stone（山石）
+   * 辅助色：Mist（雾）、Ink（墨）、Paper（纸）
+   * 
+   * 使用原则：
+   * - 品牌主色用于强调元素
+   * - Paper 系列用于背景
+   * - Text 系列用于文字层级
+   * ======================================== */
+
+  /* 品牌核心色 - Brand Core Colors */
   --color-cloud: #e8ecef;
   --color-moss: #6b7c5e;
   --color-moss-light: #8a9a7c;
   --color-moss-dark: #4d5a42;
   --color-stone: #2d2d2d;
   --color-stone-light: #555555;
+
+  /* 品牌辅助色 - Brand Accent Colors */
   --color-mist: rgba(255, 255, 255, 0.6);
   --color-ink: #1a1a1a;
   --color-paper: #ffffff;
   --color-paper-warm: #f7f6f3;
   --color-border: #ececea;
+
+  /* 文字色系 - Text Colors */
   --color-text-primary: #1a1a1a;
   --color-text-secondary: #666666;
   --color-text-muted: #999999;
   --color-text-light: #ffffff;
   --color-text-light-muted: rgba(255, 255, 255, 0.6);
 
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 16px;
-  --space-4: 24px;
-  --space-5: 32px;
-  --space-6: 48px;
-  --space-7: 64px;
-  --space-8: 96px;
-  --space-9: 128px;
-  --space-10: 160px;
+  /* ========================================
+   * Spacing System
+   * 
+   * ROUZHEN 间距系统
+   * 
+   * 基于 4px 基础单位递增
+   * 用于 margin、padding、gap
+   * ======================================== */
+
+  --space-1: 4px;   /* 紧凑元素间距 */
+  --space-2: 8px;   /* 小间距 */
+  --space-3: 16px;  /* 基础间距 */
+  --space-4: 24px;  /* 中等间距 */
+  --space-5: 32px;  /* 区块内间距 */
+  --space-6: 48px;  /* 区块间距 */
+  --space-7: 64px;  /* 大区块间距 */
+  --space-8: 96px;  /* 章节间距 */
+  --space-9: 128px; /* 大章节间距 */
+  --space-10: 160px;/* 特大间距 */
 
   --radius-sm: 2px;
   --radius-md: 4px;
@@ -44,6 +72,55 @@
   --anim-duration-slow: 1.5s;
   --anim-duration-hero: 3s;
 
+  /* ========================================
+   * Hero Animation Timeline
+   * 
+   * ROUZHEN 开场动画时间线
+   * 
+   * 调整说明：
+   * - 修改 delay 值可改变元素出现时间
+   * - 保持顺序：mountain → fog → logo → slogan → lang → scroll
+   * - 建议整体调整，保持视觉连贯
+   * 
+   * ⚠️ 不建议单独修改，会影响动画节奏
+   * ======================================== */
+
+  /* 山景动画 */
+  --hero-mountain-bw-duration: 3s;
+  --hero-mountain-bw-delay: 3s;
+  --hero-mountain-fade-duration: 2.5s;
+  --hero-mountain-fade-delay: 6s;
+  --hero-mountain-color-duration: 2.5s;
+  --hero-mountain-color-delay: 6s;
+
+  /* 雾气动画 */
+  --hero-fog-appear-duration: 3s;
+  --hero-fog-appear-2-duration: 3.5s;
+  --hero-fog-1-delay: 1s;
+  --hero-fog-2-delay: 1.5s;
+  --hero-fog-drift-1-duration: 18s;
+  --hero-fog-drift-2-duration: 22s;
+  --hero-fog-drift-3-duration: 20s;
+
+  /* 雾脉动画 */
+  --hero-tendril-1-duration: 35s;
+  --hero-tendril-2-duration: 40s;
+  --hero-tendril-3-duration: 38s;
+  --hero-tendril-1-delay: 3s;
+  --hero-tendril-2-delay: 3.5s;
+  --hero-tendril-3-delay: 3s;
+
+  /* 内容动画（核心时间线） */
+  --hero-logo-duration: 1.2s;
+  --hero-logo-delay: 8s;
+  --hero-slogan-duration: 1.2s;
+  --hero-slogan-delay: 10s;
+  --hero-lang-duration: 1s;
+  --hero-lang-delay: 10.5s;
+  --hero-scroll-duration: 1s;
+  --hero-scroll-delay: 11s;
+  --hero-scroll-bounce-duration: 2s;
+
   --font-logo: Georgia, 'LXGW WenKai', 'Noto Serif SC', serif;
   --font-heading: Georgia, 'LXGW WenKai', 'Noto Serif SC', serif;
   --font-body: 'Noto Serif SC', Georgia, 'Songti SC', serif;
@@ -52,6 +129,39 @@
   --font-slogan: 'Cinzel', Georgia, serif;
   --font-cn-heading: 'LXGW WenKai', 'Noto Serif SC', 'Songti SC', serif;
   --font-cn-body: 'Noto Serif SC', 'LXGW WenKai', 'Songti SC', serif;
+
+  /* ========================================
+   * Z-Index System
+   * 
+   * ROUZHEN 层级系统
+   * 
+   * 分层原则（从低到高）：
+   * - 背景层 (1-10)：山景、雾气
+   * - 内容层 (11-20)：Logo、Slogan、内容区块
+   * - 固定层 (100+)：导航栏、弹窗
+   * 
+   * ⚠️ 新增层级请使用变量，避免魔法数字
+   * ======================================== */
+
+  /* 背景层 - Background Layer */
+  --z-mountain: 1;         /* 山景背景 */
+  --z-fog: 5;              /* 雾气层 */
+
+  /* 内容层 - Content Layer */
+  --z-content: 10;         /* 普通内容 */
+  --z-hero-bottom: 15;     /* Hero 底部区域 */
+  --z-hero-content: 20;    /* Hero Logo/Slogan */
+
+  /* 固定层 - Fixed Layer */
+  --z-header: 100;         /* 导航栏 */
+  --z-modal: 200;          /* 弹窗（未来预留） */
+  --z-toast: 300;          /* 提示（未来预留） */
+
+  /* ========================================
+   * Container System
+   * 
+   * 容器宽度规范
+   * ======================================== */
 
   --container-max: 1200px;
   --container-narrow: 640px;

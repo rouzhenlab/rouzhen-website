@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0, viewport-fit=cover">
+  <meta name="description" content="ROUZHEN Journal — 生态档案，记录自然美学的探索与思考">
+  <meta name="keywords" content="ROUZHEN Journal, 自然美学, 苔藓, 生态档案">
+  <meta name="author" content="ROUZHEN">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ROUZHEN Journal — 生态档案">
+  <meta property="og:description" content="记录自然美学的探索与思考">
+  <meta property="og:url" content="https://rouzhen.com/journal/">
+
+  <link rel="icon" type="image/svg+xml" href="../assets/svg/favicon.svg">
+
+  <title>Journal — ROUZHEN</title>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="../styles/variables.css">
+  <link rel="stylesheet" href="../styles/typography.css">
+  <link rel="stylesheet" href="../styles/layout.css">
+  <link rel="stylesheet" href="../styles/animation.css">
+  <link rel="stylesheet" href="../components/Navigation/Navigation.css">
+  <link rel="stylesheet" href="../components/Footer/Footer.css">
+
+  <style>
+    /* Journal Specific Styles */
+    .journal-header {
+      padding: var(--space-10) var(--space-3) var(--space-8);
+      text-align: center;
+      min-height: 40vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .journal-title {
+      font-family: var(--font-heading);
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-4);
+      letter-spacing: 0.1em;
+    }
+
+    .journal-subtitle {
+      font-family: var(--font-body);
+      font-size: var(--space-4);
+      color: var(--color-text-secondary);
+      max-width: var(--container-narrow);
+      line-height: 1.8;
+    }
+
+    .journal-content {
+      padding: 0 var(--space-3) var(--space-10);
+      max-width: var(--container-max);
+      margin: 0 auto;
+    }
+
+    .journal-entries {
+      display: grid;
+      gap: var(--space-6);
+    }
+
+    .journal-entry {
+      border-bottom: 1px solid var(--color-border);
+      padding-bottom: var(--space-6);
+      transition: opacity var(--transition-base);
+    }
+
+    .journal-entry:hover {
+      opacity: 0.8;
+    }
+
+    .journal-entry-date {
+      font-family: var(--font-body);
+      font-size: var(--space-3);
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-2);
+      letter-spacing: 0.05em;
+    }
+
+    .journal-entry-title {
+      font-family: var(--font-heading);
+      font-size: clamp(1.25rem, 3vw, 1.75rem);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-3);
+      text-decoration: none;
+      display: block;
+    }
+
+    .journal-entry-title:hover {
+      color: var(--color-moss);
+    }
+
+    .journal-entry-excerpt {
+      font-family: var(--font-body);
+      font-size: var(--space-3);
+      color: var(--color-text-secondary);
+      line-height: 1.8;
+    }
+
+    .journal-entry-tags {
+      display: flex;
+      gap: var(--space-2);
+      margin-top: var(--space-3);
+      flex-wrap: wrap;
+    }
+
+    .journal-tag {
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      color: var(--color-moss);
+      padding: var(--space-1) var(--space-2);
+      border: 1px solid var(--color-moss);
+      border-radius: var(--radius-sm);
+    }
+
+    .journal-empty {
+      text-align: center;
+      padding: var(--space-10) var(--space-3);
+      color: var(--color-text-muted);
+    }
+
+    .journal-empty-text {
+      font-family: var(--font-body);
+      font-size: var(--space-4);
+      line-height: 1.8;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .journal-header {
+        padding: var(--space-8) var(--space-3) var(--space-6);
+        min-height: 30vh;
+      }
+
+      .journal-content {
+        padding: 0 var(--space-3) var(--space-8);
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header" id="header">
+    <nav class="navbar">
+      <div class="nav-logo">
+        <a href="../index.html">
+          <span class="nav-wave">~</span>
+        </a>
+      </div>
+      <ul class="nav-menu" id="navMenu">
+        <li><a href="../index.html#home" class="nav-link" data-en="Home" data-cn="首页">Home</a></li>
+        <li><a href="../index.html#philosophy" class="nav-link" data-en="Philosophy" data-cn="理念">Philosophy</a></li>
+        <li><a href="../index.html#story" class="nav-link" data-en="Story" data-cn="故事">Story</a></li>
+        <li><a href="../index.html#collections" class="nav-link" data-en="Collections" data-cn="系列">Collections</a></li>
+        <li><a href="../index.html#lab" class="nav-link" data-en="Lab" data-cn="实验">Lab</a></li>
+        <li><a href="index.html" class="nav-link active" data-en="Journal" data-cn="档案">Journal</a></li>
+        <li><a href="../index.html#contact" class="nav-link" data-en="Contact" data-cn="联系">Contact</a></li>
+      </ul>
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="journal-header">
+      <h1 class="journal-title">Journal</h1>
+      <p class="journal-subtitle" data-en="Ecological archives — records of natural aesthetics exploration" data-cn="生态档案 — 记录自然美学的探索与思考">Ecological archives — records of natural aesthetics exploration</p>
+    </section>
+
+    <section class="journal-content">
+      <div class="journal-entries" id="journalEntries">
+        <!-- Entries will be loaded from data/entries.json -->
+        <div class="journal-empty">
+          <p class="journal-empty-text" data-en="Coming soon..." data-cn="即将到来...">Coming soon...</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-logo">~</div>
+        <p class="footer-text">ROUZHEN</p>
+        <p class="footer-copyright">Between Cloud & Moss</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="../scripts/main.js"></script>
+  <script>
+    // Journal Entry Loader
+    // Future: Load entries from data/entries.json
+    // Future: Support Markdown rendering
+    // Future: i18n support
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Placeholder for future entry loading
+      // const entriesContainer = document.getElementById('journalEntries');
+      // fetch('data/entries.json')
+      //   .then(response => response.json())
+      //   .then(data => renderEntries(data))
+      //   .catch(error => console.log('Journal entries will be available soon'));
+    });
+  </script>
+
+</body>
+</html>

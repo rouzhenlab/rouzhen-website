@@ -15,7 +15,7 @@
   inset: 0;
   background: url('../../assets/images/hero-bg.jpg') center / cover no-repeat;
   opacity: 0;
-  animation: mountainColorReveal 2.5s ease-in-out 6s forwards;
+  animation: mountainColorReveal var(--hero-mountain-color-duration) ease-in-out var(--hero-mountain-color-delay) forwards;
 }
 
 .mountain-bw {
@@ -24,7 +24,7 @@
   background: url('../../assets/images/hero-bg.jpg') center / cover no-repeat;
   filter: grayscale(1);
   opacity: 0;
-  animation: mountainBWReveal 3s ease-in-out 3s forwards, mountainBWFadeOut 2.5s ease-in-out 6s forwards;
+  animation: mountainBWReveal var(--hero-mountain-bw-duration) ease-in-out var(--hero-mountain-bw-delay) forwards, mountainBWFadeOut var(--hero-mountain-fade-duration) ease-in-out var(--hero-mountain-fade-delay) forwards;
 }
 
 .fog-container {
@@ -35,7 +35,7 @@
   height: 45%;
   pointer-events: none;
   overflow: visible;
-  z-index: 5;
+  z-index: var(--z-fog);
 }
 
 .fog {
@@ -52,7 +52,7 @@
   bottom: 10%;
   left: -100%;
   opacity: 0;
-  animation: fogAppear 3s ease-out 1s forwards, fogDrift1 18s ease-in-out 1s infinite;
+  animation: fogAppear var(--hero-fog-appear-duration) ease-out var(--hero-fog-1-delay) forwards, fogDrift1 var(--hero-fog-drift-1-duration) ease-in-out var(--hero-fog-1-delay) infinite;
 }
 
 .fog-2 {
@@ -62,7 +62,7 @@
   bottom: 15%;
   left: -150%;
   opacity: 0;
-  animation: fogAppear 3.5s ease-out 1.5s forwards, fogDrift2 22s ease-in-out 1.5s infinite;
+  animation: fogAppear var(--hero-fog-appear-2-duration) ease-out var(--hero-fog-2-delay) forwards, fogDrift2 var(--hero-fog-drift-2-duration) ease-in-out var(--hero-fog-2-delay) infinite;
 }
 
 .fog-3 {
@@ -71,7 +71,7 @@
   bottom: 5%;
   left: -80%;
   opacity: 0;
-  animation: fogAppear 3s ease-out 1.5s forwards, fogDrift3 20s ease-in-out 1.5s infinite;
+  animation: fogAppear var(--hero-fog-appear-duration) ease-out var(--hero-fog-2-delay) forwards, fogDrift3 var(--hero-fog-drift-3-duration) ease-in-out var(--hero-fog-2-delay) infinite;
 }
 
 .mist-tendril {
@@ -87,21 +87,21 @@
   left: 28%;
   bottom: 38%;
   opacity: 0;
-  animation: tendril1 35s ease-in-out 3s infinite;
+  animation: tendril1 var(--hero-tendril-1-duration) ease-in-out var(--hero-tendril-1-delay) infinite;
 }
 
 .mist-tendril-2 {
   left: 48%;
   bottom: 42%;
   opacity: 0;
-  animation: tendril2 40s ease-in-out 3.5s infinite;
+  animation: tendril2 var(--hero-tendril-2-duration) ease-in-out var(--hero-tendril-2-delay) infinite;
 }
 
 .mist-tendril-3 {
   right: 25%;
   bottom: 35%;
   opacity: 0;
-  animation: tendril3 38s ease-in-out 3s infinite;
+  animation: tendril3 var(--hero-tendril-3-duration) ease-in-out var(--hero-tendril-3-delay) infinite;
 }
 
 @keyframes mountainBWReveal {
@@ -184,7 +184,7 @@
 
 .hero-content {
   position: relative;
-  z-index: 20;
+  z-index: var(--z-hero-content);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -193,7 +193,7 @@
 
 .reveal-logo {
   opacity: 0;
-  animation: gentleFadeIn 1.2s ease-out 8s forwards;
+  animation: gentleFadeIn var(--hero-logo-duration) ease-out var(--hero-logo-delay) forwards;
 }
 
 .logo-img {
@@ -226,14 +226,14 @@ body.lang-cn .logo-cn {
   flex-direction: column;
   align-items: center;
   gap: 0;
-  z-index: 15;
+  z-index: var(--z-hero-bottom);
   width: 100%;
 }
 
 .hero-slogan {
   opacity: 0;
   text-align: center;
-  animation: sloganFadeIn 1.2s ease-out 10s forwards;
+  animation: sloganFadeIn var(--hero-slogan-duration) ease-out var(--hero-slogan-delay) forwards;
 }
 
 .slogan-text {
@@ -258,7 +258,7 @@ body.lang-cn .logo-cn {
   gap: 12px;
   opacity: 0;
   margin-top: 16px;
-  animation: langFadeIn 1s ease-out 10.5s forwards;
+  animation: langFadeIn var(--hero-lang-duration) ease-out var(--hero-lang-delay) forwards;
 }
 
 .lang-btn {
@@ -300,7 +300,7 @@ body.lang-cn .logo-cn {
 
 .scroll-indicator {
   opacity: 0;
-  animation: fadeInLate 1s ease-out 11s forwards, bounce 2s 11s infinite;
+  animation: fadeInLate var(--hero-scroll-duration) ease-out var(--hero-scroll-delay) forwards, bounce var(--hero-scroll-bounce-duration) var(--hero-scroll-delay) infinite;
 }
 
 .scroll-indicator span {

@@ -1,0 +1,22 @@
+# Video Assets Directory
+
+This directory is reserved for video assets.
+
+## Usage
+
+Place video files here:
+- `.mp4` - Recommended format for web
+- `.webm` - Alternative format for better compression
+- `.mov` - Source files (consider converting for production)
+
+## Naming Convention
+
+- Use lowercase and hyphens: `hero-background.mp4`
+- Include purpose prefix: `hero-`, `journal-`, `promo-`
+- Add size suffix if multiple versions: `-mobile`, `-desktop`
+
+## Optimization
+
+- Compress videos before adding to repository
+- Consider hosting large videos externally (Cloudflare R2, etc.)
+- Provide multiple formats for browser compatibility
