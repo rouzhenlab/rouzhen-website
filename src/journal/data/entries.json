@@ -1,29 +1,25 @@
 {
   "entries": [
     {
-      "id": "example-entry",
-      "title": "Example Entry",
-      "slug": "example-entry",
-      "date": "2026-07-13",
-      "excerpt": "This is an example entry for future reference.",
-      "tags": ["example"],
-      "lang": {
-        "en": {
-          "title": "Example Entry",
-          "excerpt": "This is an example entry for future reference."
-        },
-        "cn": {
-          "title": "示例文章",
-          "excerpt": "这是一篇示例文章，供未来参考。"
-        }
-      },
-      "published": false
+      "id": "cloud-without-patent",
+      "title": "一根软管，一片苔藓，和一朵不会申请专利的云",
+      "titleEn": "A Tube, a Patch of Moss, and a Cloud Beyond Patents",
+      "slug": "2026-07-14-cloud-without-patent",
+      "file": "entries/2026-07-14-cloud-without-patent.html",
+      "fileEn": "entries/2026-07-14-cloud-without-patent-en.html",
+      "date": "2026-07-14",
+      "excerpt": "技术可以被学习，结构可以被复制。但审美，需要一点一点积累。",
+      "excerptEn": "Technology can be replicated. Structures can be reverse-engineered. Taste cannot.",
+      "tags": ["创作", "自然", "哲学"],
+      "tagsEn": ["Creation", "Nature", "Philosophy"],
+      "published": true,
+      "bilingual": true
     }
   ],
   "meta": {
-    "version": "1.0",
-    "lastUpdated": "2026-07-13",
+    "version": "1.1",
+    "lastUpdated": "2026-07-14",
     "description": "ROUZHEN Journal entries index",
-    "note": "This file will be used for dynamic entry loading in the future"
+    "note": "This file will be used for dynamic entry loading in the future. Supports bilingual entries."
   }
 }
