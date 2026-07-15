@@ -11,6 +11,11 @@ document.addEventListener('DOMContentLoaded', () => {
       el.textContent = el.getAttribute('data-' + lang);
     });
 
+    const hrefElements = document.querySelectorAll('[data-en-href][data-cn-href]');
+    hrefElements.forEach(el => {
+      el.setAttribute('href', el.getAttribute('data-' + lang + '-href'));
+    });
+
     langBtns.forEach(btn => {
       if (btn.getAttribute('data-lang') === lang) {
         btn.classList.add('active');
