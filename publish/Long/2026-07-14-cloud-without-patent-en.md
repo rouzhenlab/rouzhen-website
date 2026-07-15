@@ -1,6 +1,15 @@
-# A Tube, a Patch of Moss, and a Cloud Beyond Patents
+---
+title: A Tube, a Patch of Moss, and a Cloud Beyond Patents
+date: 2026.07.14
+cover: https://pub-d925d0cb281a418d91ad6617fc10bc86.r2.dev/journal/moss-stone-fog-1.jpg.jpg
+tags:
+  - ROUZHEN
+  - BetweenCloudAndMoss
+  - MossArt
+  - CloudEcology
+---
 
-**
+# A Tube, a Patch of Moss, and a Cloud Beyond Patents
 
 > Technology can be replicated. Structures can be reverse-engineered. Taste cannot.
 
@@ -80,4 +89,4 @@ of the rhythm life was always meant to keep.
 
 ---
 
-Tags: Creation · Nature · Philosophy
+Tags: #ROUZHEN · #BetweenCloudAndMoss · #MossArt · #CloudEcology

@@ -1,10 +1,10 @@
 {
-  "generated": "2026-07-15T10:08:03.311541",
+  "generated": "2026-07-15T11:25:57.839760",
   "articles": [
     {
       "source": "journal/entries/2026-07-14-cloud-without-patent.html",
       "title": "一根软管，一片苔藓，和一朵不会申请专利的云",
-      "date": "",
+      "date": "2026.07.14",
       "lang": "cn",
       "outputs": {
         "Long": "publish/Long/2026-07-14-cloud-without-patent.md",
@@ -16,7 +16,7 @@
     {
       "source": "journal/entries/2026-07-14-cloud-without-patent-en.html",
       "title": "A Tube, a Patch of Moss, and a Cloud Beyond Patents",
-      "date": "",
+      "date": "2026.07.14",
       "lang": "en",
       "outputs": {
         "Long": "publish/Long/2026-07-14-cloud-without-patent-en.md",
