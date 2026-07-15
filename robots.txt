@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://rouzhen.com/sitemap.xml
+Sitemap: https://rouzhen.pages.dev/sitemap.xml
