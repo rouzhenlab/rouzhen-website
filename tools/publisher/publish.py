@@ -45,12 +45,15 @@ def parse_article(html_path):
 
     tags = re.findall(r'<span class="article-tag[^"]*">([^<]*)</span>', content)
 
-    # Body paragraphs
-    body_match = re.search(r'<div class="article-body[^>]*>(.*?)</div>\s*<footer', content, re.DOTALL)
+    # Body paragraphs — support multiple article-body divs
+    body_sections = re.findall(r'<div class="article-body[^>]*>(.*?)</div>', content, re.DOTALL)
     paragraphs = []
-    if body_match:
-        paragraphs = re.findall(r'<p[^>]*>(.*?)</p>', body_match.group(1), re.DOTALL)
-        paragraphs = [re.sub(r'<[^>]+>', '', p).strip() for p in paragraphs if p.strip()]
+    for section in body_sections:
+        section_paragraphs = re.findall(r'<p[^>]*>(.*?)</p>', section, re.DOTALL)
+        for p in section_paragraphs:
+            clean_p = re.sub(r'<[^>]+>', '', p).strip()
+            if clean_p:
+                paragraphs.append(clean_p)
 
     # Pull quote
     quote_match = re.search(r'<div class="article-pull-quote[^>]*>(.*?)</div>', content, re.DOTALL)

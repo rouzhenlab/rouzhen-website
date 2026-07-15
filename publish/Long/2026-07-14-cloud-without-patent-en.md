@@ -39,19 +39,11 @@ It no longer rushed upward. Instead, it clung to the stone, spreading slowly, al
 
 I stood there for a long time, simply watching.
 
-"It can't be this simple," I thought.
-
-"It's almost too simple."
-
 But that embarrassingly simple moment quietly changed the question I had been asking.
-
-A cloud never follows a blueprint. It appears when water, temperature, terrain, and time happen to meet.
 
 Perhaps I had been asking the wrong question all along. I wanted to create a cloud. Instead, I kept trying to invent a better fog machine.
 
 Very little in nature is truly new.
-
-Water.Stone.Wood.Mist.Light.
 
 They have always been here.
 
@@ -73,19 +65,9 @@ All I ever wanted was to let a stone and a patch of moss breathe a little more l
 
 Patents matter. They protect ideas, structures, and engineering.
 
-Technology can be replicated. Structures can be reverse-engineered. Taste cannot.
-
 Looking back, that little silicone tube brought me closer to my original question than any patent document ever did. Not because it was ingenious. But because it was quiet enough to let the mist find its own way.
 
 Many people have walked this road before me. I'm simply another traveler in that long conversation between humans and nature—someone who stopped, watched, waited, and eventually found a small tributary of my own.
-
-Mist is not an effect.
-
-Moss is not decoration.
-
-Together, they simply remind me
-
-of the rhythm life was always meant to keep.
 
 ---
 
