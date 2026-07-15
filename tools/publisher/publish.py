@@ -249,17 +249,14 @@ def find_visual_fragment(paragraphs, lang, existing=None):
                '想造', '以为', '发现', '明白', '开始', '如果', '什么',
                '为什么', '只不过', '几十年', '专门', '造园', '假山',
                '盆景', '做陶', '泥土', '念头', '软管', '谁都可以',
-               '照着', '照着摆', '不好意思', '材料', '堆',
-               '可是', '但是', '然而', '不过', '后来', '直到',
-               '终于', '原来', '其实', '后来']
+               '照着', '照着摆', '不好意思', '材料', '堆']
     en_skip = ['patent', 'reading', 'read', 'atomization', 'system', 'parameter',
                'structure', 'airflow', 'moat', 'wondered', 'realized',
                'thought', 'wanted', 'decades', 'career', 'reverse',
                'replicated', 'engineered', 'protect', 'protecting',
                'tube', 'anyone', 'same tube', 'same materials',
-               'but', 'however', 'until', 'then', 'finally',
-               'actually', 'turned out', 'i realized', 'i thought',
-               'i wanted', 'i wondered', 'i discovered']
+               'i realized', 'i thought', 'i wanted', 'i wondered',
+               'i discovered']
 
     visual_kw = cn_visual if lang == 'cn' else en_visual
     skip_kw = cn_skip if lang == 'cn' else en_skip

@@ -23,7 +23,7 @@ tags:
 Conflict ↓ Search ↓ Discovery ↓ Insight
 
 **Opening rule:**
-- Must begin with human conflict, not object/research description
+- Narrative starts from tension or unanswered question
 - Preferred: I thought... I wondered... I wanted to know...
 - Avoid: Technical nouns as first sentence
 
@@ -47,7 +47,7 @@ Conflict ↓ Search ↓ Discovery ↓ Insight
 - Engineering
 - Personal struggle
 - Development diary
-- Transition words: but, however, until, then, finally, actually
+- Personal narrative transitions: 因此我发现, 后来我明白, 我终于意识到, I realized, I discovered
 
 **English hashtags only.**
 
