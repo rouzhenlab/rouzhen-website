@@ -30,6 +30,9 @@
 }
 
 .footer-logo {
+  display: flex;
+  justify-content: center;
+  align-items: center;
   margin-bottom: var(--space-2);
   opacity: 0.8;
 }
