@@ -5,3 +5,9 @@ Thumbs.db
 *.zip
 dist/
 build/
+
+# Local image backups (originals stored in R2)
+src/assets/images/journal/
+
+# Unused Worker (project uses R2 public URL instead)
+workers/
