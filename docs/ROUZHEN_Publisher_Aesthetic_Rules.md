@@ -1,6 +1,8 @@
 # ROUZHEN Publisher Aesthetic Rules
 
-## 1. Long Article Template
+> v1.0 — Content System
+
+## 1. Long = The Creator
 
 **Purpose:** Creator voice / complete narrative
 
@@ -17,7 +19,7 @@ tags:
   - 自然设计
 ```
 
-## 2. Image Template (Xiaohongshu)
+## 2. Image = The Seeker (Xiaohongshu)
 
 **Narrative structure:**
 Conflict ↓ Search ↓ Discovery ↓ Insight
@@ -32,7 +34,7 @@ Conflict ↓ Search ↓ Discovery ↓ Insight
 - Start with philosophy
 - Start with realization
 
-## 3. Photo Template (Instagram)
+## 3. Photo = The Observer (Instagram)
 
 **Role:** Photo is the protagonist.
 
@@ -40,6 +42,7 @@ Conflict ↓ Search ↓ Discovery ↓ Insight
 - Visual
 - Sensory
 - Philosophy
+- Photographer presence without intrusion
 
 **Forbidden:**
 - Research process
@@ -47,11 +50,12 @@ Conflict ↓ Search ↓ Discovery ↓ Insight
 - Engineering
 - Personal struggle
 - Development diary
-- Personal narrative transitions: 因此我发现, 后来我明白, 我终于意识到, I realized, I discovered
+- Author as story subject
+- Personal narrative transitions: I discovered, I realized, I learned
 
 **English hashtags only.**
 
-## 4. Micro Template
+## 4. Micro = The Philosopher
 
 **Format:** Two-line philosophy.
 
