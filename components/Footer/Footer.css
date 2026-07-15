@@ -30,15 +30,16 @@
 }
 
 .footer-logo {
-  width: 100px;
-  height: auto;
+  width: 16px;
+  height: 16px;
   margin-bottom: var(--space-3);
   opacity: 0.7;
 }
 
 .footer-logo img {
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: contain;
 }
 
 .footer-name {
