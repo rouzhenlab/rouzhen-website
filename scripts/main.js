@@ -45,15 +45,10 @@ document.addEventListener('DOMContentLoaded', () => {
     return zhLangCodes.some(code => browserLang.startsWith(code)) ? 'cn' : 'en';
   }
 
-  function detectPageLang() {
-    const path = window.location.pathname;
-    if (path.includes('-en.html')) return 'en';
-    if (path.match(/-\d{4}-\d{2}-\d{2}-/) && !path.includes('-en.html')) return 'cn';
-    return null;
-  }
-
+  // 优先级：页面声明语言 (data-page-lang) > localStorage > 浏览器语言检测
+  // 文章页通过 body data-page-lang 声明自身语言，确保跳转后语言状态一致
   try {
-    const pageLang = detectPageLang();
+    const pageLang = document.body.getAttribute('data-page-lang');
     const savedLang = localStorage.getItem('rouzhen-lang');
     
     if (pageLang) {
@@ -61,12 +56,10 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (savedLang) {
       setLanguage(savedLang);
     } else {
-      const detectedLang = detectLanguage();
-      setLanguage(detectedLang);
+      setLanguage(detectLanguage());
     }
   } catch (e) {
-    const detectedLang = detectLanguage();
-    setLanguage(detectedLang);
+    setLanguage(detectLanguage());
   }
 
   window.addEventListener('scroll', () => {
