@@ -45,9 +45,20 @@ document.addEventListener('DOMContentLoaded', () => {
     return zhLangCodes.some(code => browserLang.startsWith(code)) ? 'cn' : 'en';
   }
 
+  function detectPageLang() {
+    const path = window.location.pathname;
+    if (path.includes('-en.html')) return 'en';
+    if (path.match(/-\d{4}-\d{2}-\d{2}-/) && !path.includes('-en.html')) return 'cn';
+    return null;
+  }
+
   try {
+    const pageLang = detectPageLang();
     const savedLang = localStorage.getItem('rouzhen-lang');
-    if (savedLang) {
+    
+    if (pageLang) {
+      setLanguage(pageLang);
+    } else if (savedLang) {
       setLanguage(savedLang);
     } else {
       const detectedLang = detectLanguage();
