@@ -305,8 +305,8 @@ body.lang-cn .logo-cn {
 
 .scroll-indicator img {
   display: block;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: auto;
   object-fit: contain;
 }
 
