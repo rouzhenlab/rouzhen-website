@@ -31,11 +31,11 @@
 }
 
 @keyframes drift {
-  0%   { transform: translateX(6px) translateY(0); opacity: 0.85; }
-  25%  { transform: translateX(14px) translateY(-4px); opacity: 1; }
-  50%  { transform: translateX(8px) translateY(-8px); opacity: 0.9; }
-  75%  { transform: translateX(-2px) translateY(-2px); opacity: 1; }
-  100% { transform: translateX(6px) translateY(0); opacity: 0.85; }
+  0%   { transform: translateX(2px) translateY(0); opacity: 0.85; }
+  25%  { transform: translateX(12px) translateY(-4px); opacity: 1; }
+  50%  { transform: translateX(6px) translateY(-8px); opacity: 0.9; }
+  75%  { transform: translateX(-8px) translateY(-2px); opacity: 1; }
+  100% { transform: translateX(2px) translateY(0); opacity: 0.85; }
 }
 
 .anim-fade-in {
