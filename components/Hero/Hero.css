@@ -300,6 +300,7 @@ body.lang-cn .logo-cn {
 
 .scroll-indicator {
   opacity: 0;
+  margin-top: 14px;
   animation: fadeInLate var(--hero-scroll-duration) ease-out var(--hero-scroll-delay) forwards, bounce var(--hero-scroll-bounce-duration) var(--hero-scroll-delay) infinite;
 }
 
@@ -308,6 +309,7 @@ body.lang-cn .logo-cn {
   width: 24px;
   height: auto;
   object-fit: contain;
+  margin-left: 2px;
 }
 
 @keyframes fadeInLate {
