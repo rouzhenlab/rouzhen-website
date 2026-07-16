@@ -301,10 +301,8 @@ body.lang-cn .logo-cn {
 .scroll-indicator {
   opacity: 0;
   margin-top: 14px;
-  position: relative;
-  left: 50%;
-  transform: translateX(-50%);
-  animation: fadeInLate var(--hero-scroll-duration) ease-out var(--hero-scroll-delay) forwards, bounce-soft var(--hero-scroll-bounce-duration) var(--hero-scroll-delay) infinite;
+  margin-left: 10px;
+  animation: fadeInLate var(--hero-scroll-duration) ease-out var(--hero-scroll-delay) forwards, bounce var(--hero-scroll-bounce-duration) var(--hero-scroll-delay) infinite;
 }
 
 .scroll-indicator img {
@@ -312,7 +310,6 @@ body.lang-cn .logo-cn {
   width: 24px;
   height: auto;
   object-fit: contain;
-  margin-left: 8px;
 }
 
 @keyframes fadeInLate {
