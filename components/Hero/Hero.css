@@ -309,7 +309,7 @@ body.lang-cn .logo-cn {
   width: 24px;
   height: auto;
   object-fit: contain;
-  margin-left: 2px;
+  margin-left: 6px;
 }
 
 @keyframes fadeInLate {
