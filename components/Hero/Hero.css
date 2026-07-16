@@ -301,7 +301,6 @@ body.lang-cn .logo-cn {
 .scroll-indicator {
   opacity: 0;
   margin-top: 14px;
-  margin-left: 10px;
   animation: fadeInLate var(--hero-scroll-duration) ease-out var(--hero-scroll-delay) forwards, drift 6s ease-in-out var(--hero-scroll-delay) infinite;
 }
 
