@@ -303,11 +303,11 @@ body.lang-cn .logo-cn {
   animation: fadeInLate var(--hero-scroll-duration) ease-out var(--hero-scroll-delay) forwards, bounce var(--hero-scroll-bounce-duration) var(--hero-scroll-delay) infinite;
 }
 
-.scroll-indicator span {
+.scroll-indicator img {
   display: block;
-  width: 1px;
-  height: 30px;
-  background: var(--color-text-light-muted);
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
 }
 
 @keyframes fadeInLate {
