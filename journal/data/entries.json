@@ -1,6 +1,21 @@
 {
   "entries": [
     {
+      "id": "ai-website",
+      "title": "我让 AI 帮我做了一个国际网站",
+      "titleEn": "I Asked AI to Help Me Build an International Website",
+      "slug": "2026-07-17-ai-website",
+      "file": "entries/2026-07-17-ai-website.html",
+      "fileEn": "entries/2026-07-17-ai-website-en.html",
+      "date": "2026-07-17",
+      "excerpt": "不是从完整的方案开始，而是从一个模糊的感觉里，慢慢把网站长出来。",
+      "excerptEn": "It did not begin with a complete plan. It began with a vague feeling that slowly became a website.",
+      "tags": ["创作", "自然", "AI"],
+      "tagsEn": ["Creation", "Nature", "AI"],
+      "published": true,
+      "bilingual": true
+    },
+    {
       "id": "cloud-without-patent",
       "title": "一根软管，一片苔藓，和一朵不会申请专利的云",
       "titleEn": "A Tube, a Patch of Moss, and a Cloud Beyond Patents",

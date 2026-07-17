@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="I Asked AI to Help Me Build an International Website — ROUZHEN Journal">
+  <meta name="author" content="ROUZHEN">
+  <meta name="article-date" content="2026.07.17">
+
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="I Asked AI to Help Me Build an International Website">
+  <meta property="og:description" content="It did not begin with a complete plan. It began with a vague feeling that slowly became a website.">
+  <meta property="og:url" content="https://rouzhen.pages.dev/journal/entries/2026-07-17-ai-website-en.html">
+  <meta property="og:image" content="/assets/images/hero-bg.jpg">
+  <link rel="canonical" href="https://rouzhen.pages.dev/journal/entries/2026-07-17-ai-website-en.html">
+
+  <link rel="icon" type="image/svg+xml" href="/assets/svg/favicon.svg">
+
+  <title>I Asked AI to Help Me Build an International Website — ROUZHEN Journal</title>
+
+  <link rel="stylesheet" href="/styles/variables.css">
+  <link rel="stylesheet" href="/styles/typography.css">
+  <link rel="stylesheet" href="/styles/layout.css">
+  <link rel="stylesheet" href="/styles/animation.css">
+  <link rel="stylesheet" href="/components/Navigation/Navigation.css">
+  <link rel="stylesheet" href="/components/Footer/Footer.css">
+
+  <style>
+    .article-hero {
+      padding: var(--space-10) var(--space-3) var(--space-6);
+      text-align: center;
+      max-width: var(--container-narrow);
+      margin: 0 auto;
+    }
+
+    .article-date {
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      color: var(--color-text-muted);
+      letter-spacing: 0.1em;
+      margin-bottom: var(--space-4);
+    }
+
+    .article-title {
+      font-family: var(--font-heading);
+      font-size: clamp(1.5rem, 4vw, 2.25rem);
+      color: var(--color-text-primary);
+      line-height: 1.4;
+      letter-spacing: 0.01em;
+      margin-bottom: var(--space-5);
+    }
+
+    .article-divider {
+      width: 40px;
+      height: 1px;
+      background: var(--color-border);
+      margin: 0 auto var(--space-6);
+    }
+
+    .article-body {
+      max-width: var(--container-narrow);
+      margin: 0 auto;
+      padding: 0 var(--space-3) var(--space-8);
+    }
+
+    .article-body p {
+      font-family: var(--font-body);
+      font-size: 1.0625rem;
+      line-height: 1.88;
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-4);
+    }
+
+    .article-pull-quote {
+      max-width: var(--container-narrow);
+      margin: var(--space-6) auto;
+      padding: var(--space-4) var(--space-3);
+      border-left: 2px solid var(--color-moss);
+      padding-left: var(--space-5);
+    }
+
+    .article-pull-quote p {
+      font-family: var(--font-heading);
+      font-size: 1.25rem;
+      line-height: 1.7;
+      color: var(--color-moss-dark);
+      margin: 0;
+    }
+
+    .article-reflection {
+      max-width: var(--container-narrow);
+      margin: var(--space-6) auto;
+      padding-left: var(--space-5);
+      border-left: 1px solid var(--color-border);
+    }
+
+    .article-reflection p {
+      font-family: var(--font-body);
+      font-size: 1rem;
+      line-height: 1.8;
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-2);
+    }
+
+    .article-image-container {
+      max-width: var(--container-narrow);
+      margin: var(--space-5) auto var(--space-7);
+      position: relative;
+    }
+
+    .article-image {
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      max-height: 65vh;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto;
+      border-radius: var(--radius-md);
+    }
+
+    .article-closing {
+      max-width: var(--container-narrow);
+      margin: var(--space-7) auto 0;
+      padding-top: var(--space-5);
+      border-top: 1px solid var(--color-border);
+    }
+
+    .article-closing p {
+      font-family: var(--font-heading);
+      font-size: 1.125rem;
+      line-height: 2;
+      color: var(--color-moss-dark);
+      margin-bottom: var(--space-2);
+    }
+
+    .article-footer {
+      max-width: var(--container-narrow);
+      margin: var(--space-10) auto var(--space-6);
+      padding: var(--space-6) var(--space-3);
+      border-top: 1px solid var(--color-border);
+    }
+
+    .article-tags {
+      display: flex;
+      gap: var(--space-2);
+      margin-bottom: var(--space-6);
+      flex-wrap: wrap;
+    }
+
+    .article-tag {
+      font-family: var(--font-body);
+      font-size: 0.75rem;
+      color: var(--color-moss);
+      padding: var(--space-1) var(--space-3);
+      border: 1px solid var(--color-moss);
+      border-radius: var(--radius-sm);
+      letter-spacing: 0.05em;
+    }
+
+    .article-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-3);
+      padding-top: var(--space-5);
+      border-top: 1px solid var(--color-border);
+    }
+
+    .article-back {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      text-decoration: none;
+      padding: var(--space-2) var(--space-3);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      transition: all var(--transition-base);
+      background: transparent;
+    }
+
+    .article-back:hover {
+      color: var(--color-moss);
+      border-color: var(--color-moss);
+      background: rgba(107, 142, 35, 0.05);
+    }
+
+    .article-back::before {
+      content: '←';
+      font-size: 1rem;
+    }
+
+    .article-lang-switch {
+      font-family: var(--font-body);
+      font-size: 0.8125rem;
+      color: var(--color-text-muted);
+      letter-spacing: 0.05em;
+    }
+
+    .article-lang-switch a {
+      color: var(--color-moss);
+      text-decoration: none;
+      padding-bottom: 2px;
+      border-bottom: 1px solid transparent;
+      transition: border-color var(--transition-fast);
+    }
+
+    .article-lang-switch a:hover {
+      border-bottom-color: var(--color-moss);
+    }
+
+    @media (max-width: 768px) {
+      .article-hero {
+        padding: var(--space-8) var(--space-3) var(--space-4);
+      }
+
+      .article-body p {
+        font-size: 1rem;
+        line-height: 1.85;
+      }
+
+      .article-pull-quote p {
+        font-size: 1.0625rem;
+      }
+
+      .article-closing p {
+        font-size: 1rem;
+      }
+    }
+  </style>
+</head>
+<body data-page-lang="en">
+  <header class="header" id="header">
+    <nav class="navbar">
+      <div class="nav-logo">
+        <a href="/" aria-label="ROUZHEN Home">
+          <span class="nav-wave">~</span>
+        </a>
+      </div>
+      <ul class="nav-menu" id="navMenu">
+        <li><a href="/" class="nav-link" data-en="Home" data-cn="首页">Home</a></li>
+        <li><a href="/#philosophy" class="nav-link" data-en="Philosophy" data-cn="理念">Philosophy</a></li>
+        <li><a href="/#story" class="nav-link" data-en="Story" data-cn="故事">Story</a></li>
+        <li><a href="/#collections" class="nav-link" data-en="Collections" data-cn="系列">Collections</a></li>
+        <li><a href="/#lab" class="nav-link" data-en="Lab" data-cn="实验">Lab</a></li>
+        <li><a href="/journal/index.html" class="nav-link active" data-en="Journal" data-cn="札记">Journal</a></li>
+        <li><a href="/#contact" class="nav-link" data-en="Contact" data-cn="联系">Contact</a></li>
+      </ul>
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <article>
+      <header class="article-hero">
+        <time class="article-date" datetime="2026-07-17">2026.07.17</time>
+        <h1 class="article-title">I Asked AI to Help Me Build an International Website</h1>
+        <div class="article-divider"></div>
+      </header>
+
+      <div class="article-body">
+        <p>A month ago, I had a thought.</p>
+        <p>It was not a full business plan, nor a finished brand identity. It felt more like a vague sensation: moss, clouds, nature, and a little bit of future technology. I wanted to see what might happen if these things came together.</p>
+        <p>So I did what many people are doing now: I opened an AI chat and said, “Help me build an international website.”</p>
+        <p>Looking back, that sentence was rather bold. At the time, I didn’t even know exactly what the site should become.</p>
+      </div>
+
+      <div class="article-pull-quote">
+        <p>Many designs are not planned from the beginning. They slowly take shape through repeated attempts until one moment finally feels right.</p>
+      </div>
+
+      <div class="article-body">
+        <p>In the beginning, I could only describe a feeling. I did not provide AI with a complete design document. Most of what I said was uncertain: quieter, not too cold, some Eastern aesthetics, but not like a traditional garden website; some sense of the future, but not like a typical sci-fi movie.</p>
+        <p>If I had spoken to a designer, they might have asked, “So what exactly do you want?” At that point, I might not have had a clear answer. What was interesting was that AI never seemed bothered by a vague idea. It kept offering new directions.</p>
+        <p>What about this one? What if we tried another approach? Less technology, more nature? Through those repeated changes, I began to understand my own idea better. I realized I was not simply trying to make a “beautiful website.”</p>
+      </div>
+
+      <div class="article-reflection">
+        <p>A website slowly became a world.</p>
+        <p>At first, it was only a few pages. Later, more elements started to appear: a logo, a slogan, a color system, a photographic direction, and even a symbol.</p>
+      </div>
+
+      <div class="article-body">
+        <p>For example, the “~”. At first, it was just a simple curve. Later, I realized it could represent clouds, water vapor, or the soft living rhythm of moss growth. Many design decisions are not discovered at the beginning. They emerge through countless experiments until one moment feels inevitable.</p>
+        <p>“Yes. That’s it.”</p>
+      </div>
+
+      <figure class="article-image-container">
+        <img src="https://pub-d925d0cb281a418d91ad6617fc10bc86.r2.dev/journal/file_00000000655471f4af7b83af88c42c1f.jpg" alt="AI-generated website concept and visual direction" class="article-image">
+      </figure>
+
+      <div class="article-body">
+        <p>AI did not make the process easy. Many people imagine AI creation like this: type a sentence, click generate, and the result appears. In reality, it is quite different. More often, it sounds like: “No, too commercial.” “Too much like a normal technology website.” “Less future, more life.” “This is good, but it’s not what I’m looking for.” Then you try again.</p>
+        <p>Sometimes, even a small detail requires many revisions: whether a logo remains legible when reduced, whether the image has enough breathing space, or whether one sentence on the page feels natural. AI can generate many possibilities, but the final decision still comes from human judgment.</p>
+      </div>
+
+      <div class="article-pull-quote">
+        <p>Creation is not a single output. It is a process of conversation that gradually gives form to a vague feeling.</p>
+      </div>
+
+      <div class="article-body">
+        <p>I used to think that building an international website required designers, programmers, photographers, writers, and a full team. Now I see that a single person can begin. Of course, that does not mean one person replaces every professional role. It simply means AI has lowered the barrier to starting.</p>
+        <p>You do not have to wait until everything is ready. One idea, one sketch, or one sentence can become a starting point. Then, through ongoing conversation, it slowly becomes clearer.</p>
+        <p>Looking back, this website is still far from finished. But it records something interesting: a feeling about clouds and moss gradually grew into its own shape through repeated exchanges between a human and AI.</p>
+        <p>Perhaps a future brand will not always begin with a business plan. Sometimes, it can begin with a simple sentence: “I have a strange idea.”</p>
+      </div>
+
+      <div class="article-closing">
+        <p>Documented with Yunzhongke</p>
+      </div>
+
+      <footer class="article-footer">
+        <div class="article-tags">
+          <span class="article-tag">Creation</span>
+          <span class="article-tag">Nature</span>
+          <span class="article-tag">AI</span>
+        </div>
+        <div class="article-nav">
+          <a href="/journal/index.html" class="article-back">Back to Journal</a>
+          <span class="article-lang-switch"><a href="/journal/entries/2026-07-17-ai-website.html">中文版</a></span>
+        </div>
+      </footer>
+    </article>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <div class="footer-logo">
+            <img src="/assets/svg/logo-white-en.svg" alt="ROUZHEN" class="footer-logo-en">
+            <img src="/assets/svg/logo-white-cn.svg" alt="柔眞" class="footer-logo-cn">
+          </div>
+          <p class="footer-tagline" data-en="Between Cloud & Moss" data-cn="云～苔　之　间">Between Cloud & Moss</p>
+        </div>
+        <nav class="footer-links">
+          <a href="/" class="footer-link" data-en="Home" data-cn="首页">Home</a>
+          <a href="/#philosophy" class="footer-link" data-en="Philosophy" data-cn="理念">Philosophy</a>
+          <a href="/#collections" class="footer-link" data-en="Collections" data-cn="系列">Collections</a>
+          <a href="/journal/index.html" class="footer-link" data-en="Journal" data-cn="札记">Journal</a>
+          <a href="/#contact" class="footer-link" data-en="Contact" data-cn="联系">Contact</a>
+        </nav>
+        <div class="footer-bottom">
+          <p class="footer-copyright">© 2026 ROUZHEN</p>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/scripts/main.js"></script>
+</body>
+</html>
