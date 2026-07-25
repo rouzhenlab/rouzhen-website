@@ -1,6 +1,31 @@
 {
   "entries": [
     {
+      "id": "the-free-battle",
+      "title": "免费大作战",
+      "titleEn": "The Free Battle",
+      "slug": "2026-07-25-the-free-battle",
+      "file": "entries/2026-07-25-the-free-battle.html",
+      "fileEn": "entries/2026-07-25-the-free-battle-en.html",
+      "date": "2026-07-25",
+      "excerpt": "没有团队。",
+      "excerptEn": "No large team.",
+      "tags": [
+        "ROUZHEN",
+        "AI",
+        "Content OS",
+        "Creator System"
+      ],
+      "tagsEn": [
+        "ROUZHEN",
+        "AI",
+        "Content OS",
+        "Creator System"
+      ],
+      "published": true,
+      "bilingual": true
+    },
+    {
       "id": "2026-07-25",
       "title": "免费大作战",
       "titleEn": "The Free Battle",
