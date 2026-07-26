@@ -30,6 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       localStorage.setItem('rouzhen-lang', lang);
     } catch (e) {}
+
+    updateNowModule(lang);
   }
 
   langBtns.forEach(btn => {
@@ -107,7 +109,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ==================== Now / 停雲 时间入口 ====================
-  (async () => {
+  // entries.json 缓存，避免每次切换语言都重新请求
+  let nowEntriesCache = null;
+
+  async function updateNowModule(lang) {
     const linkEl = document.getElementById('nowLatestEntry');
     const dateEl = document.getElementById('nowDate');
     const titleEl = document.getElementById('nowTitle');
@@ -116,39 +121,38 @@ document.addEventListener('DOMContentLoaded', () => {
     // 如果当前页面没有 Now 模块，直接跳过执行
     if (!linkEl) return;
 
-    // 1. 同步检测主页现有的中英文切换机制（依据根节点 lang 属性）
-    const htmlLang = document.documentElement.lang || navigator.language || 'zh';
-    const isEnglish = htmlLang.toLowerCase().startsWith('en');
+    const isEnglish = lang === 'en';
 
-    if (isEnglish && projectEl) {
-      projectEl.textContent = 'Ting Yun';
+    if (projectEl) {
+      projectEl.textContent = isEnglish ? 'Ting Yun' : '停雲';
     }
 
     try {
-      // 2. 使用绝对路径读取 Publisher 维护的 entries.json
-      const response = await fetch('/journal/data/entries.json');
-      if (!response.ok) return;
+      if (!nowEntriesCache) {
+        // entries.json 顶层是 { entries: [...], meta: {...} }，取值要用 data.entries
+        const response = await fetch('/journal/data/entries.json');
+        if (!response.ok) return;
 
-      const entries = await response.json();
-      if (!Array.isArray(entries) || entries.length === 0) return;
-
-      // 3. Publisher 保证最新文章永远在第一项，直接取 entries[0]
-      const latest = entries[0];
-
-      if (latest) {
-        linkEl.href = `/journal/entries/${latest.slug}.html`;
-        dateEl.textContent = latest.date.replace(/-/g, '.');
-
-        // 4. 根据当前语言环境自动匹配对应标题字段
-        if (isEnglish) {
-          titleEl.textContent = latest.title_en || latest.title_zh || latest.title;
-        } else {
-          titleEl.textContent = latest.title_zh || latest.title || latest.title_en;
-        }
+        const data = await response.json();
+        nowEntriesCache = Array.isArray(data.entries) ? data.entries : [];
       }
+
+      if (nowEntriesCache.length === 0) return;
+
+      // Publisher 保证最新文章永远在第一项，直接取 [0]
+      const latest = nowEntriesCache[0];
+      if (!latest) return;
+
+      // 字段名对应 entries.json 实际结构：file/fileEn 已含 entries/ 前缀，中文标题字段是 title，英文是 titleEn
+      const file = isEnglish ? (latest.fileEn || latest.file) : (latest.file || latest.fileEn);
+      linkEl.href = `/journal/${file}`;
+      dateEl.textContent = latest.date.replace(/-/g, '.');
+      titleEl.textContent = isEnglish
+        ? (latest.titleEn || latest.title)
+        : (latest.title || latest.titleEn);
     } catch (e) {
-      // 5. 失败 Fallback：保持默认 href="/journal/" 指向 Journal 首页
+      // 失败 Fallback：保持默认占位内容
       console.debug('Now module fallback to Journal index.');
     }
-  })();
+  }
 });
