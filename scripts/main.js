@@ -1,4 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // 提到最前面：setLanguage() 在页面加载时会立即被调用（见下方语言检测逻辑），
+  // 必须确保 updateNowModule 用到的这个变量在那之前就已经完成初始化，
+  // 否则 let 声明会因为"暂时性死区"直接报错（Cannot access before initialization）。
+  let nowEntriesCache = null;
+
   const header = document.getElementById('header');
   const navMenu = document.getElementById('navMenu');
   const menuToggle = document.getElementById('menuToggle');
@@ -109,8 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ==================== Now / 停雲 时间入口 ====================
-  // entries.json 缓存，避免每次切换语言都重新请求
-  let nowEntriesCache = null;
+  // entries.json 缓存变量已提到文件最前面声明，这里直接用
 
   async function updateNowModule(lang) {
     const linkEl = document.getElementById('nowLatestEntry');
