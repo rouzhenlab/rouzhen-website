@@ -116,16 +116,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const linkEl = document.getElementById('nowLatestEntry');
     const dateEl = document.getElementById('nowDate');
     const titleEl = document.getElementById('nowTitle');
-    const projectEl = document.getElementById('nowProjectName');
 
     // 如果当前页面没有 Now 模块，直接跳过执行
     if (!linkEl) return;
 
     const isEnglish = lang === 'en';
-
-    if (projectEl) {
-      projectEl.textContent = isEnglish ? 'Ting Yun' : '停雲';
-    }
 
     try {
       if (!nowEntriesCache) {
