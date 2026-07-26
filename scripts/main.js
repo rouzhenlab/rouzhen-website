@@ -102,6 +102,54 @@ document.addEventListener('DOMContentLoaded', () => {
   animateElements.forEach(el => {
     el.style.opacity = '0';
     el.style.transform = 'translateY(24px)';
+
+
+
+
+    document.addEventListener('DOMContentLoaded', async () => {
+  const linkEl = document.getElementById('nowLatestEntry');
+  const dateEl = document.getElementById('nowDate');
+  const titleEl = document.getElementById('nowTitle');
+  const projectEl = document.getElementById('nowProjectName');
+
+  // 如果当前页面没有 Now 模块，直接跳过执行
+  if (!linkEl) return;
+
+  // 1. 同步检测主页现有的中英文切换机制（依据根节点 lang 属性）
+  const htmlLang = document.documentElement.lang || navigator.language || 'zh';
+  const isEnglish = htmlLang.toLowerCase().startsWith('en');
+
+  if (isEnglish && projectEl) {
+    projectEl.textContent = 'Ting Yun';
+  }
+
+  try {
+    // 2. 使用绝对路径读取 Publisher 维护的 entries.json
+    const response = await fetch('/journal/data/entries.json');
+    if (!response.ok) return;
+    
+    const entries = await response.json();
+    if (!Array.isArray(entries) || entries.length === 0) return;
+
+    // 3. Publisher 保证最新文章永远在第一项，直接取 entries[0]
+    const latest = entries[0];
+
+    if (latest) {
+      linkEl.href = `/journal/entries/${latest.slug}.html`;
+      dateEl.textContent = latest.date.replace(/-/g, '.');
+
+      // 4. 根据当前语言环境自动匹配对应标题字段
+      if (isEnglish) {
+        titleEl.textContent = latest.title_en || latest.title_zh || latest.title;
+      } else {
+        titleEl.textContent = latest.title_zh || latest.title || latest.title_en;
+      }
+    }
+  } catch (e) {
+    // 5. 失败 Fallback：保持默认 href="/journal/" 指向 Journal 首页
+    console.debug('Now module fallback to Journal index.');
+  }
+});
     el.style.transition = 'all 0.8s cubic-bezier(0.4, 0, 0.2, 1)';
     observer.observe(el);
   });
