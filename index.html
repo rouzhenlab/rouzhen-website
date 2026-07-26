@@ -93,16 +93,17 @@
   </section>
 
 <!-- ==================== Now / 停雲 时间入口 ==================== -->
-<section class="now-time-section">
+<!-- 默认隐藏，只有 main.js 成功取到最新文章后才会显示（见 updateNowModule） -->
+<section class="now-time-section" id="nowTimeSection">
   <a href="/journal/index.html" class="now-time-block" id="nowLatestEntry">
     <div class="now-eyebrow">
       <span class="now-label">NOW</span>
       <span class="now-divider">/</span>
-      <span class="now-project" id="nowProjectName" data-en="TINGYUN" data-cn="停雲">停雲</span>
+      <span class="now-project" id="nowProjectName" data-en="Ting Yun" data-cn="停雲">停雲</span>
     </div>
     <div class="now-content">
-      <span class="now-date" id="nowDate">2026.--.--</span>
-      <h3 class="now-title" id="nowTitle" data-en="Reading the latest thread..." data-cn="正在读取最新作品...">正在读取最新作品...</h3>
+      <span class="now-date" id="nowDate"></span>
+      <h3 class="now-title" id="nowTitle"></h3>
     </div>
     <span class="now-arrow" aria-hidden="true">→</span>
   </a>
@@ -137,7 +138,7 @@
   <section class="story" id="story">
     <div class="container">
       <div class="section-header">
-        <h2 class="section-title" data-en="Why ROUZHEN" data-cn="为何柔眞">Why ROUZHEN</h2>
+        <h2 class="section-title" data-en="Why ROUZHEN" data-cn="为何 柔眞">Why ROUZHEN</h2>
         <p class="section-subtitle" data-en="Brand Story" data-cn="品牌故事">Brand Story</p>
       </div>
 
