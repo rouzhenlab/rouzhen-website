@@ -91,6 +91,11 @@ body {
   z-index: var(--z-content);
   background: var(--color-paper);
   padding: var(--space-6) 0;
+  display: none; /* 默认隐藏，main.js 拿到最新文章后加 .is-ready 才显示 */
+}
+
+.now-time-section.is-ready {
+  display: block;
 }
 
 .now-time-block {
