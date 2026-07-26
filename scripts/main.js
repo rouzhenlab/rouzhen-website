@@ -145,9 +145,13 @@ document.addEventListener('DOMContentLoaded', () => {
       titleEl.textContent = isEnglish
         ? (latest.titleEn || latest.title)
         : (latest.title || latest.titleEn);
+
+      // 数据齐全才显示这个区块，避免露出加载中的半成品状态
+      const sectionEl = document.getElementById('nowTimeSection');
+      if (sectionEl) sectionEl.classList.add('is-ready');
     } catch (e) {
-      // 失败 Fallback：保持默认占位内容
-      console.debug('Now module fallback to Journal index.');
+      // 失败 Fallback：整个区块保持隐藏，不露出半成品状态
+      console.debug('Now module failed to load, section stays hidden.', e);
     }
   }
 });
