@@ -80,9 +80,12 @@ body {
     font-size: 24px;
   }
 
+  .section-header {
+    margin-bottom: var(--space-6);
+  }
+}
 
-
-  /* ROUZHEN Now 极简雾感时间入口（完全剥离卡片与边框感） */
+/* ROUZHEN Now 极简雾感时间入口（完全剥离卡片与边框感） */
 .now-time-section {
   position: relative;
   z-index: 10;
@@ -141,8 +144,4 @@ body {
   color: var(--text-main, #f0f2ef);
   font-family: "Noto Serif SC", serif;
   line-height: 1.6;
-}
-  .section-header {
-    margin-bottom: var(--space-6);
-  }
 }
