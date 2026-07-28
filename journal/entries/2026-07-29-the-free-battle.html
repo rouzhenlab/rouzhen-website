@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="免费大作战">
+  <meta name="author" content="ROUZHEN">
+  <meta name="article-date" content="2026.07.29">
+
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="免费大作战">
+  <meta property="og:url" content="https://rouzhen.pages.dev/journal/entries/2026-07-29-the-free-battle.html">
+  <link rel="canonical" href="https://rouzhen.pages.dev/journal/entries/2026-07-29-the-free-battle.html">
+
+  <link rel="icon" type="image/svg+xml" href="/assets/svg/favicon.svg">
+
+  <title>免费大作战 — ROUZHEN Journal</title>
+
+  <link rel="stylesheet" href="/styles/variables.css">
+  <link rel="stylesheet" href="/styles/typography.css">
+  <link rel="stylesheet" href="/styles/layout.css">
+  <link rel="stylesheet" href="/styles/animation.css">
+  <link rel="stylesheet" href="/components/Navigation/Navigation.css">
+  <link rel="stylesheet" href="/components/Footer/Footer.css">
+
+  <style>
+    .article-hero { padding: var(--space-10) var(--space-3) var(--space-6); text-align: center; max-width: var(--container-narrow); margin: 0 auto; }
+    .article-date { font-family: var(--font-body); font-size: 0.875rem; color: var(--color-text-muted); letter-spacing: 0.1em; margin-bottom: var(--space-4); }
+    .article-title { font-family: var(--font-heading); font-size: clamp(1.5rem, 4vw, 2.25rem); color: var(--color-text-primary); line-height: 1.4; letter-spacing: 0.01em; margin-bottom: var(--space-5); }
+    .article-divider { width: 40px; height: 1px; background: var(--color-border); margin: 0 auto var(--space-6); }
+    .article-body { max-width: var(--container-narrow); margin: 0 auto; padding: 0 var(--space-3) var(--space-4); }
+    .article-body p { font-family: var(--font-body); font-size: 1.0625rem; line-height: 1.9; color: var(--color-text-primary); margin-bottom: var(--space-4); }
+    .article-subtitle { font-family: var(--font-heading); font-size: 1.1rem; color: var(--color-text-secondary); text-align: center; margin-bottom: var(--space-6) !important; }
+    .article-section-heading { font-family: var(--font-heading); font-size: 1.25rem; color: var(--color-moss-dark); margin: var(--space-7) 0 var(--space-4); }
+    .article-image-container { margin: var(--space-6) auto; max-width: var(--container-narrow); }
+    .article-image-container img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; display: block; }
+    .article-pull-quote { max-width: var(--container-narrow); margin: var(--space-7) auto; padding-left: var(--space-5); border-left: 2px solid var(--color-moss); }
+    .article-pull-quote p { font-family: var(--font-heading); font-size: 1.15rem; line-height: 1.7; color: var(--color-moss-dark); margin: 0; }
+    .article-closing { max-width: var(--container-narrow); margin: var(--space-8) auto 0; padding: var(--space-6) var(--space-3) 0; border-top: 1px solid var(--color-border); }
+    .article-closing p { font-family: var(--font-heading); font-size: 1.05rem; line-height: 2; color: var(--color-moss-dark); margin-bottom: var(--space-2); text-align: center; }
+    .article-footer { max-width: var(--container-narrow); margin: var(--space-8) auto var(--space-6); padding: var(--space-6) var(--space-3); border-top: 1px solid var(--color-border); }
+    .article-tags { display: flex; gap: var(--space-2); margin-bottom: var(--space-6); flex-wrap: wrap; }
+    .article-tag { font-family: var(--font-body); font-size: 0.75rem; color: var(--color-moss); padding: var(--space-1) var(--space-3); border: 1px solid var(--color-moss); border-radius: var(--radius-sm); letter-spacing: 0.05em; }
+    .article-nav { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3); padding-top: var(--space-5); border-top: 1px solid var(--color-border); }
+    .article-back { display: inline-flex; align-items: center; gap: var(--space-2); font-family: var(--font-body); font-size: 0.875rem; color: var(--color-text-secondary); text-decoration: none; padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: transparent; }
+    .article-back::before { content: '←'; font-size: 1rem; }
+    .article-lang-switch { font-family: var(--font-body); font-size: 0.8125rem; color: var(--color-text-muted); letter-spacing: 0.05em; }
+    .article-lang-switch a { color: var(--color-moss); text-decoration: none; }
+    @media (max-width: 768px) {
+      .article-hero { padding: var(--space-8) var(--space-3) var(--space-4); }
+      .article-body p { font-size: 1rem; line-height: 1.85; }
+    }
+  </style>
+</head>
+<body data-page-lang="cn">
+
+  <header class="header" id="header">
+    <nav class="navbar">
+      <div class="nav-logo">
+        <a href="/" aria-label="ROUZHEN Home"><span class="nav-wave">~</span></a>
+      </div>
+      <ul class="nav-menu" id="navMenu">
+        <li><a href="/" class="nav-link">首页</a></li>
+        <li><a href="/#philosophy" class="nav-link">理念</a></li>
+        <li><a href="/#story" class="nav-link">故事</a></li>
+        <li><a href="/#collections" class="nav-link">系列</a></li>
+        <li><a href="/#lab" class="nav-link">实验</a></li>
+        <li><a href="/journal/index.html" class="nav-link active">札记</a></li>
+        <li><a href="/#contact" class="nav-link">联系</a></li>
+      </ul>
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu"><span></span><span></span><span></span></button>
+    </nav>
+  </header>
+
+  <main>
+    <article>
+      <header class="article-hero">
+        <time class="article-date" datetime="2026-07-29">2026.07.29</time>
+        <h1 class="article-title">免费大作战</h1>
+        <div class="article-divider"></div>
+      </header>
+
+      <div class="article-body">
+        <p class="article-subtitle">一个关于限制与创造的实验</p>
+        <p>有时候，创造并不是从拥有更多开始。</p>
+        <p>ROUZHEN Studio 的诞生，来自一个简单的问题：</p>
+        <p>如果没有昂贵的软件，<br>
+        没有专业团队，<br>
+        没有无限预算，</p>
+        <p>一个人是否依然可以建立属于自己的创造系统？</p>
+        <blockquote class="article-pull-quote"><p>真正重要的，<br>
+        不是拥有多少工具，<br>
+        而是如何让有限的资源产生连接。</p></blockquote>
+        <h2 class="article-section-heading">从工具，到系统</h2>
+        <p>最初，AI 只是一个个独立的工具。</p>
+        <p>文字。</p>
+        <p>图片。</p>
+        <p>代码。</p>
+        <p>整理。</p>
+        <p>它们各自拥有能力，却彼此分散。</p>
+        <p>真正困难的地方，并不是寻找一个更强大的工具。</p>
+        <p>而是让这些工具形成一种长期运行的关系。</p>
+        <figure class="article-image-container" style="aspect-ratio:16/9"><img src="https://pub-d925d0cb281a418d91ad6617fc10bc86.r2.dev/journal/IMG_20200610_164746.jpg" alt=""></figure>
+        <p>ROUZHEN Studio 的探索，就是建立这种关系。</p>
+        <p>让 AI 参与思考。</p>
+        <p>让代码承担重复工作。</p>
+        <p>让开源工具成为基础设施。</p>
+        <p>让内容资产保持长期拥有。</p>
+        <h2 class="article-section-heading">免费，不只是价格</h2>
+        <p>“免费大作战”听起来像一个玩笑。</p>
+        <p>但它背后是一场关于资源管理的实验。</p>
+        <p>每一次 AI 额度。</p>
+        <p>每一次模型选择。</p>
+        <p>每一次工具切换。</p>
+        <p>都是一次创造流程中的调度。</p>
+        <blockquote class="article-pull-quote"><p>限制并不会停止创造，<br>
+        它会迫使我们重新理解创造。</p></blockquote>
+        <h2 class="article-section-heading">一个没有团队的团队</h2>
+        <p>过去，一个完整的内容系统需要很多角色。</p>
+        <p>设计。</p>
+        <p>编辑。</p>
+        <p>开发。</p>
+        <p>运营。</p>
+        <p>现在，一个人开始拥有新的可能。</p>
+        <p>不同的 AI 可以承担不同职责。</p>
+        <p>一个负责探索。</p>
+        <p>一个负责整理。</p>
+        <p>一个负责实现。</p>
+        <p>一个负责检查。</p>
+        <figure class="article-image-container"><img src="https://pub-d925d0cb281a418d91ad6617fc10bc86.r2.dev/journal/IMG_20201221_160112.jpg" alt=""></figure>
+        <p>它们不是替代创造者。</p>
+        <p>它们改变的是创造过程。</p>
+        <h2 class="article-section-heading">限制中的自由</h2>
+        <p>没有无限预算，</p>
+        <p>所以需要选择。</p>
+        <p>没有无限工具，</p>
+        <p>所以需要判断。</p>
+        <p>没有完整团队，</p>
+        <p>所以需要重新设计流程。</p>
+        <p>ROUZHEN Studio 记录的，不是一场省钱实验。</p>
+        <p>而是一种新的个人创造方式。</p>
+      </div>
+
+      <div class="article-closing">
+        <p>免费大作战，</p>
+        <p>只是这场实验的名字。</p>
+        <p>真正被记录的是：</p>
+        <p>一个人在有限条件下，</p>
+        <p>如何不断寻找新的创造路径。</p>
+        <p>～</p>
+        <p>停雲～记录整理</p>
+        <p>ROUZHEN</p>
+        <p>Between Cloud & Moss</p>
+      </div>
+
+      <footer class="article-footer">
+        <div class="article-tags">
+          <span class="article-tag">#AI创作</span>
+          <span class="article-tag">#个人工作室</span>
+          <span class="article-tag">#ContentOS</span>
+          <span class="article-tag">#AI</span>
+          <span class="article-tag">#CreativeProcess</span>
+        </div>
+        <div class="article-nav">
+          <a href="/journal/index.html" class="article-back">返回札记</a>
+          <span class="article-lang-switch"><a href="/journal/entries/2026-07-29-the-free-battle-en.html">English</a></span>
+        </div>
+      </footer>
+    </article>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <div class="footer-logo">
+            <img src="/assets/svg/logo-white-en.svg" alt="ROUZHEN" class="footer-logo-en">
+            <img src="/assets/svg/logo-white-cn.svg" alt="柔眞" class="footer-logo-cn">
+          </div>
+          <p class="footer-tagline">云～苔　之　间</p>
+        </div>
+        <nav class="footer-links">
+          <a href="/" class="footer-link">首页</a>
+          <a href="/#philosophy" class="footer-link">理念</a>
+          <a href="/#collections" class="footer-link">系列</a>
+          <a href="/journal/index.html" class="footer-link">札记</a>
+          <a href="/#contact" class="footer-link">联系</a>
+        </nav>
+        <div class="footer-bottom"><p class="footer-copyright">© 2026 ROUZHEN</p></div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/scripts/main.js"></script>
+</body>
+</html>
