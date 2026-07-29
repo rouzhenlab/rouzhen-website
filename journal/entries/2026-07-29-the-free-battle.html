@@ -40,7 +40,8 @@
     .article-closing p { font-family: var(--font-heading); font-size: 1.05rem; line-height: 2; color: var(--color-moss-dark); margin-bottom: var(--space-2); text-align: center; }
     .article-footer { max-width: var(--container-narrow); margin: var(--space-8) auto var(--space-6); padding: var(--space-6) var(--space-3); border-top: 1px solid var(--color-border); }
     .article-tags { display: flex; gap: var(--space-2); margin-bottom: var(--space-6); flex-wrap: wrap; }
-    .article-tag { font-family: var(--font-body); font-size: 0.75rem; color: var(--color-moss); padding: var(--space-1) var(--space-3); border: 1px solid var(--color-moss); border-radius: var(--radius-sm); letter-spacing: 0.05em; }
+    .article-tag { display: inline-block; font-family: var(--font-body); font-size: 0.75rem; color: var(--color-moss); padding: var(--space-1) var(--space-3); border: 1px solid var(--color-moss); border-radius: var(--radius-sm); letter-spacing: 0.05em; text-decoration: none; transition: background 0.15s, color 0.15s; }
+    .article-tag:hover { background: var(--color-moss); color: #fff; }
     .article-nav { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-3); padding-top: var(--space-5); border-top: 1px solid var(--color-border); }
     .article-back { display: inline-flex; align-items: center; gap: var(--space-2); font-family: var(--font-body); font-size: 0.875rem; color: var(--color-text-secondary); text-decoration: none; padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: transparent; }
     .article-back::before { content: '←'; font-size: 1rem; }
@@ -155,11 +156,11 @@
 
       <footer class="article-footer">
         <div class="article-tags">
-          <span class="article-tag">#AI创作</span>
-          <span class="article-tag">#个人工作室</span>
-          <span class="article-tag">#ContentOS</span>
-          <span class="article-tag">#AI</span>
-          <span class="article-tag">#CreativeProcess</span>
+          <a href="/journal.html?tag=%23AI%E5%88%9B%E4%BD%9C" class="article-tag" target="_top">#AI创作</a>
+          <a href="/journal.html?tag=%23%E4%B8%AA%E4%BA%BA%E5%B7%A5%E4%BD%9C%E5%AE%A4" class="article-tag" target="_top">#个人工作室</a>
+          <a href="/journal.html?tag=%23ContentOS" class="article-tag" target="_top">#ContentOS</a>
+          <a href="/journal.html?tag=%23AI" class="article-tag" target="_top">#AI</a>
+          <a href="/journal.html?tag=%23CreativeProcess" class="article-tag" target="_top">#CreativeProcess</a>
         </div>
         <div class="article-nav">
           <a href="/journal/index.html" class="article-back">返回札记</a>
