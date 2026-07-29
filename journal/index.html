@@ -29,9 +29,9 @@
   <style>
     /* Journal Specific Styles */
     .journal-header {
-      padding: var(--space-10) var(--space-3) var(--space-8);
+      padding: var(--space-10) var(--space-3) var(--space-6);
       text-align: center;
-      min-height: 40vh;
+      min-height: 30vh;
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -54,6 +54,54 @@
       line-height: 1.8;
     }
 
+    /* ── Tag Filter Bar ── */
+    .tag-filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: var(--space-2);
+      max-width: var(--container-narrow);
+      margin: 0 auto var(--space-6);
+      padding: 0 var(--space-3);
+    }
+
+    .tag-filter-bar:empty {
+      display: none;
+    }
+
+    .tag-pill {
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      color: var(--color-moss);
+      background: transparent;
+      padding: var(--space-1) var(--space-3);
+      border: 1px solid var(--color-moss);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      user-select: none;
+      transition: background var(--transition-fast), color var(--transition-fast);
+    }
+
+    .tag-pill:hover {
+      background: rgba(107, 124, 94, 0.06);
+    }
+
+    .tag-pill.active {
+      background: var(--color-moss);
+      color: var(--color-text-light);
+    }
+
+    .tag-count {
+      font-size: 0.75rem;
+      opacity: 0.7;
+      margin-left: 2px;
+    }
+
+    .tag-pill.active .tag-count {
+      opacity: 0.85;
+    }
+
+    /* ── Journal Content ── */
     .journal-content {
       padding: 0 var(--space-3) var(--space-10);
       max-width: var(--container-max);
@@ -119,6 +167,13 @@
       padding: var(--space-1) var(--space-2);
       border: 1px solid var(--color-moss);
       border-radius: var(--radius-sm);
+      background: transparent;
+      cursor: pointer;
+      transition: background var(--transition-fast), color var(--transition-fast);
+    }
+
+    .journal-tag:hover {
+      background: rgba(107, 124, 94, 0.06);
     }
 
     .journal-empty {
@@ -136,12 +191,16 @@
     /* Responsive */
     @media (max-width: 768px) {
       .journal-header {
-        padding: var(--space-8) var(--space-3) var(--space-6);
-        min-height: 30vh;
+        padding: var(--space-8) var(--space-3) var(--space-5);
+        min-height: 25vh;
       }
 
       .journal-content {
         padding: 0 var(--space-3) var(--space-8);
+      }
+
+      .tag-filter-bar {
+        margin-bottom: var(--space-5);
       }
     }
   </style>
@@ -178,6 +237,8 @@
       <p class="journal-subtitle" data-en="Ecological archives — records of natural aesthetics exploration" data-cn="生态札记 — 记录自然美学的探索与思考">Ecological archives — records of natural aesthetics exploration</p>
     </section>
 
+    <div class="tag-filter-bar" id="tagFilterBar"></div>
+
     <section class="journal-content">
       <div class="journal-entries" id="journalEntries"></div>
       <div class="journal-empty" id="journalEmpty" hidden>
@@ -213,80 +274,188 @@
   <!-- Scripts -->
   <script src="/scripts/main.js"></script>
   <script>
-    // Journal Entry Loader —— v0.8.0
-    // 从 journal/data/entries.json 动态渲染卡片，不再维护写死的文章列表
+    // Journal Entry Loader —— v0.9.0
+    // 从 journal/data/entries.json 动态渲染卡片，支持标签筛选
+    // ────────────────────────────────────────────────────────────────
+    //  纯静态：只读 entries.json，标签计算 + 筛选全在前端。
+    //  无 Worker · 无 API · 无 Token · 无跨域。
+
+    var ALL_ENTRIES = [];
+    var ALL_TAGS = {};       // { "#Tag": count }
+    var ACTIVE_TAG = "";
 
     function escapeHtml(str) {
-      const div = document.createElement("div");
+      var div = document.createElement("div");
       div.textContent = str || "";
       return div.innerHTML;
+    }
+
+    function escapeAttr(str) {
+      return String(str).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
     }
 
     function formatDateDisplay(dateStr) {
       return (dateStr || "").replace(/-/g, ".");
     }
 
+    /* ── 筛选后的条目 ── */
+    function filteredEntries() {
+      if (!ACTIVE_TAG) return ALL_ENTRIES;
+      return ALL_ENTRIES.filter(function(e) {
+        return (e.tags || []).indexOf(ACTIVE_TAG) !== -1;
+      });
+    }
+
+    /* ── 统计所有 tag 出现次数 ── */
+    function computeTags() {
+      var map = {};
+      ALL_ENTRIES.forEach(function(e) {
+        (e.tags || []).forEach(function(t) {
+          map[t] = (map[t] || 0) + 1;
+        });
+      });
+      ALL_TAGS = map;
+    }
+
+    /* ── 构建文章卡片 ── */
     function buildEntryCard(entry) {
-      const article = document.createElement("article");
+      var article = document.createElement("article");
       article.className = "journal-entry";
 
-      const tagsHtml = (entry.tags || [])
-        .map((tag, i) => {
-          const tagEn = (entry.tagsEn && entry.tagsEn[i]) || tag;
-          return `<span class="journal-tag" data-en="${escapeHtml(tagEn)}" data-cn="${escapeHtml(tag)}">${escapeHtml(tag)}</span>`;
-        })
-        .join("\n            ");
+      var tagsHtml = (entry.tags || []).map(function(tag, i) {
+        var tagEn = (entry.tagsEn && entry.tagsEn[i]) || tag;
+        return '<span class="journal-tag" data-en="' + escapeAttr(tagEn) + '" data-cn="' + escapeAttr(tag) + '" data-tag="' + escapeAttr(tag) + '">' + escapeHtml(tag) + '</span>';
+      }).join("\n            ");
 
-      article.innerHTML = `
-        <div class="journal-entry-date">${formatDateDisplay(entry.date)}</div>
-        <a href="/journal/${escapeHtml(entry.file)}" class="journal-entry-title"
-           data-cn-href="/journal/${escapeHtml(entry.file)}"
-           data-en-href="/journal/${escapeHtml(entry.fileEn || entry.file)}"
-           data-en="${escapeHtml(entry.titleEn)}" data-cn="${escapeHtml(entry.title)}">${escapeHtml(entry.title)}</a>
-        <p class="journal-entry-excerpt" data-en="${escapeHtml(entry.excerptEn)}" data-cn="${escapeHtml(entry.excerpt)}">${escapeHtml(entry.excerpt)}</p>
-        <div class="journal-entry-tags">
-            ${tagsHtml}
-        </div>
-      `;
+      article.innerHTML =
+        '<div class="journal-entry-date">' + formatDateDisplay(entry.date) + '</div>\n' +
+        '        <a href="/journal/' + escapeAttr(entry.file) + '" class="journal-entry-title"\n' +
+        '           data-cn-href="/journal/' + escapeAttr(entry.file) + '"\n' +
+        '           data-en-href="/journal/' + escapeAttr(entry.fileEn || entry.file) + '"\n' +
+        '           data-en="' + escapeAttr(entry.titleEn) + '" data-cn="' + escapeAttr(entry.title) + '">' + escapeHtml(entry.title) + '</a>\n' +
+        '        <p class="journal-entry-excerpt" data-en="' + escapeAttr(entry.excerptEn || entry.excerpt || '') + '" data-cn="' + escapeAttr(entry.excerpt || '') + '">' + escapeHtml(entry.excerpt || '') + '</p>\n' +
+        '        <div class="journal-entry-tags">\n            ' + tagsHtml + '\n        </div>';
+
+      // 文章卡片里的 tag 点击 → 跳转到对应筛选
+      article.querySelectorAll(".journal-tag").forEach(function(el) {
+        el.addEventListener("click", function(e) {
+          e.preventDefault();
+          var t = this.getAttribute("data-tag");
+          setFilter(t);
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+      });
+
       return article;
     }
 
-    // 跟 main.js 里的语言应用逻辑保持一致，只是只作用于新插入的这些卡片：
-    // main.js 的语言初始化只在页面首次加载时跑一次，卡片是异步 fetch 完才插入的，
-    // 会错过那一次，所以插入后要照着 <body> 上已经确定的语言 class 手动补一次。
+    /* ── 渲染标签筛选栏 ── */
+    function renderTagBar() {
+      var bar = document.getElementById("tagFilterBar");
+      var tags = Object.keys(ALL_TAGS).sort(function(a, b) {
+        return ALL_TAGS[b] - ALL_TAGS[a];
+      });
+
+      if (tags.length === 0) { bar.innerHTML = ""; return; }
+
+      var html = '<span class="tag-pill' + (ACTIVE_TAG ? "" : " active") + '" data-tag="">' +
+        '<span data-en="All" data-cn="全部">全部</span>' +
+        '<span class="tag-count">' + ALL_ENTRIES.length + '</span></span>';
+
+      tags.forEach(function(t) {
+        var cls = "tag-pill" + (ACTIVE_TAG === t ? " active" : "");
+        html += '<span class="' + cls + '" data-tag="' + escapeAttr(t) + '">' +
+          escapeHtml(t) + '<span class="tag-count">' + ALL_TAGS[t] + '</span></span>';
+      });
+
+      bar.innerHTML = html;
+
+      bar.querySelectorAll(".tag-pill").forEach(function(el) {
+        el.addEventListener("click", function() {
+          setFilter(this.getAttribute("data-tag"));
+        });
+      });
+
+      // 语言适配
+      applyCurrentLanguageTo(bar);
+    }
+
+    /* ── 渲染文章列表 ── */
+    function renderEntries() {
+      var container = document.getElementById("journalEntries");
+      var emptyState = document.getElementById("journalEmpty");
+      var entries = filteredEntries();
+
+      container.innerHTML = "";
+
+      if (entries.length === 0) {
+        emptyState.hidden = false;
+        return;
+      }
+
+      emptyState.hidden = true;
+      entries.forEach(function(entry) {
+        container.appendChild(buildEntryCard(entry));
+      });
+      applyCurrentLanguageTo(container);
+    }
+
+    /* ── 设置标签筛选 ── */
+    function setFilter(tag) {
+      ACTIVE_TAG = tag;
+      updateUrl(tag);
+      renderTagBar();
+      renderEntries();
+    }
+
+    /* ── URL 参数 ── */
+    function updateUrl(tag) {
+      var url = window.location.pathname.replace(/\/$/, "");
+      if (tag) url += "?tag=" + encodeURIComponent(tag);
+      window.history.replaceState(null, "", url);
+    }
+
+    function readUrlTag() {
+      var params = new URLSearchParams(window.location.search);
+      return params.get("tag") || "";
+    }
+
+    /* ── 语言适配 ── */
     function applyCurrentLanguageTo(container) {
-      const lang = document.body.classList.contains("lang-en") ? "en" : "cn";
-      container.querySelectorAll("[data-en][data-cn]").forEach((el) => {
+      var lang = document.body.classList.contains("lang-en") ? "en" : "cn";
+      container.querySelectorAll("[data-en][data-cn]").forEach(function(el) {
         el.textContent = el.getAttribute("data-" + lang);
       });
-      container.querySelectorAll("[data-en-href][data-cn-href]").forEach((el) => {
+      container.querySelectorAll("[data-en-href][data-cn-href]").forEach(function(el) {
         el.setAttribute("href", el.getAttribute("data-" + lang + "-href"));
       });
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
-      const container = document.getElementById("journalEntries");
-      const emptyState = document.getElementById("journalEmpty");
+    /* ── 入口 ── */
+    document.addEventListener("DOMContentLoaded", function() {
+      var emptyState = document.getElementById("journalEmpty");
 
       fetch("/journal/data/entries.json")
-        .then((res) => {
-          if (!res.ok) throw new Error("entries.json 加载失败");
+        .then(function(res) {
+          if (!res.ok) throw new Error("entries.json " + res.status);
           return res.json();
         })
-        .then((data) => {
-          const entries = (data.entries || [])
-            .filter((e) => e.published !== false)
-            .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)); // date DESC，最新在前
+        .then(function(data) {
+          ALL_ENTRIES = (data.entries || [])
+            .filter(function(e) { return e.published !== false; })
+            .sort(function(a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
 
-          if (entries.length === 0) {
+          if (ALL_ENTRIES.length === 0) {
             emptyState.hidden = false;
             return;
           }
 
-          entries.forEach((entry) => container.appendChild(buildEntryCard(entry)));
-          applyCurrentLanguageTo(container);
+          computeTags();
+          ACTIVE_TAG = readUrlTag();
+          renderTagBar();
+          renderEntries();
         })
-        .catch(() => {
+        .catch(function() {
           emptyState.hidden = false;
         });
     });
