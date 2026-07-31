@@ -36,7 +36,6 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      position: relative;
     }
 
     .journal-title {
@@ -45,14 +44,6 @@
       color: var(--color-text-primary);
       margin-bottom: var(--space-4);
       letter-spacing: 0.1em;
-    }
-
-    /* Lang switch in page flow, top-right */
-    .lang-switch--inline {
-      position: absolute;
-      top: var(--space-6);
-      right: var(--space-6);
-      margin: 0;
     }
 
     .journal-subtitle {
@@ -232,6 +223,11 @@
         <li><a href="/journal/index.html" class="nav-link active" data-en="Journal" data-cn="札记">Journal</a></li>
         <li><a href="/#contact" class="nav-link" data-en="Contact" data-cn="联系">Contact</a></li>
       </ul>
+      <div class="lang-switch">
+        <button class="lang-btn" data-lang="cn">中文</button>
+        <span class="lang-sep">/</span>
+        <button class="lang-btn" data-lang="en">EN</button>
+      </div>
       <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
         <span></span>
         <span></span>
@@ -244,11 +240,6 @@
     <section class="journal-header">
       <h1 class="journal-title" data-en="Journal" data-cn="札记">Journal</h1>
       <p class="journal-subtitle" data-en="Ecological archives — records of natural aesthetics exploration" data-cn="生态札记 — 记录自然美学的探索与思考">Ecological archives — records of natural aesthetics exploration</p>
-      <div class="lang-switch lang-switch--inline">
-        <button class="lang-btn" data-lang="cn">中文</button>
-        <span class="lang-sep">/</span>
-        <button class="lang-btn" data-lang="en">EN</button>
-      </div>
     </section>
 
     <div class="tag-filter-bar" id="tagFilterBar"></div>
