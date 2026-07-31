@@ -12,17 +12,17 @@
       "excerptEn": "No large team.",
       "tags": [
         "#AI创作",
-        "studio",
-        "content-os",
-        "ai-general",
-        "craft-general"
+        "#个人工作室",
+        "#ContentOS",
+        "#AI",
+        "#CreativeProcess"
       ],
       "tagsEn": [
         "#AI创作",
-        "studio",
-        "content-os",
-        "ai-general",
-        "craft-general"
+        "#个人工作室",
+        "#ContentOS",
+        "#AI",
+        "#CreativeProcess"
       ],
       "published": true,
       "bilingual": true
@@ -38,20 +38,26 @@
       "excerpt": "没有团队。",
       "excerptEn": "No large team.",
       "tags": [
-        "studio",
-        "ai-general",
-        "content-os",
-        "creator",
+        "ROUZHEN",
+        "AI",
+        "Content OS",
+        "Creator System",
         "#AI创作",
-        "craft-general"
+        "#个人工作室",
+        "#ContentOS",
+        "#AI",
+        "#CreativeProcess"
       ],
       "tagsEn": [
-        "studio",
-        "ai-general",
-        "content-os",
-        "creator",
+        "ROUZHEN",
+        "AI",
+        "Content OS",
+        "Creator System",
         "#AI创作",
-        "craft-general"
+        "#个人工作室",
+        "#ContentOS",
+        "#AI",
+        "#CreativeProcess"
       ],
       "published": true,
       "bilingual": true
@@ -67,14 +73,14 @@
       "excerpt": "不是从完整的方案开始，而是从一个模糊的感觉里，慢慢把网站长出来。",
       "excerptEn": "It did not begin with a complete plan. It began with a vague feeling that slowly became a website.",
       "tags": [
-        "craft-general",
-        "nature-general",
-        "ai-general"
+        "创作",
+        "自然",
+        "AI"
       ],
       "tagsEn": [
-        "craft-general",
-        "nature-general",
-        "ai-general"
+        "Creation",
+        "Nature",
+        "AI"
       ],
       "published": true,
       "bilingual": true
@@ -90,23 +96,23 @@
       "excerpt": "技术可以被学习，结构可以被复制。但审美，需要一点一点积累。",
       "excerptEn": "Technology can be replicated. Structures can be reverse-engineered. Taste cannot.",
       "tags": [
-        "craft-general",
-        "nature-general",
-        "philosophy"
+        "创作",
+        "自然",
+        "哲学"
       ],
       "tagsEn": [
-        "craft-general",
-        "nature-general",
-        "philosophy"
+        "Creation",
+        "Nature",
+        "Philosophy"
       ],
       "published": true,
       "bilingual": true
     }
   ],
   "meta": {
-    "schema_version": 2,
-    "lastUpdated": "2026-07-31",
+    "version": "1.1",
+    "lastUpdated": "2026-07-29",
     "description": "ROUZHEN Journal entries index",
-    "note": "Tag values migrated from legacy strings to canonical IDs. See docs/Tag-Audit-Report.md and tools/migrate_tags.py for details."
+    "note": "This file will be used for dynamic entry loading in the future. Supports bilingual entries."
   }
 }

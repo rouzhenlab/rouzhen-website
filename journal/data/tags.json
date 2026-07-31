@@ -59,9 +59,15 @@
       "Ecology": "ecology",
       "Miniature": "miniature",
       "Landscape": "landscape",
+      "#AI": "ai-general",
+      "#个人工作室": "studio",
+      "#ContentOS": "content-os",
+      "#CreativeProcess": "craft-general",
       "Creation": "craft-general",
       "Nature": "nature-general",
       "Philosophy": "philosophy"
-    }
+    },
+    "_manual_review": ["#AI创作"],
+    "_note_v0.9": "#AI创作 为复合标签（ai-general + craft-general?），需人工确认后手动添加映射。不自动拆分。"
   }
 }

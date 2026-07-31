@@ -287,16 +287,17 @@
 
   <!-- Scripts -->
   <script src="/scripts/main.js"></script>
+  <script src="/scripts/tags.js"></script>
   <script>
-    // Journal Entry Loader —— v0.9.0
-    // 从 journal/data/entries.json 动态渲染卡片，支持标签筛选
-    // ────────────────────────────────────────────────────────────────
-    //  纯静态：只读 entries.json，标签计算 + 筛选全在前端。
-    //  无 Worker · 无 API · 无 Token · 无跨域。
+    // Journal Entry Loader —— v0.10.0 (Tag-resolved)
+    // Phase 2: 标签渲染/筛选全部通过 TagResolver → tags.json 驱动
+    // ── URL: ?tag={id}  ── Display: tags.json[cn|en]
+    // ── 未知 Tag → console.warn + 显示原始值（graceful fallback）
 
     var ALL_ENTRIES = [];
-    var ALL_TAGS = {};       // { "#Tag": count }
-    var ACTIVE_TAG = "";
+    var ACTIVE_ID = "";       // 当前筛选的 Tag ID（非原始字符串）
+    var ENTRY_TAG_IDS = {};  // { entryIndex: [id, ...] }  预计算的已解析标签 ID
+    var TAG_COUNTS = {};     // { id: count }  用于筛选栏排序
 
     function escapeHtml(str) {
       var div = document.createElement("div");
@@ -312,33 +313,41 @@
       return (dateStr || "").replace(/-/g, ".");
     }
 
-    /* ── 筛选后的条目 ── */
-    function filteredEntries() {
-      if (!ACTIVE_TAG) return ALL_ENTRIES;
-      return ALL_ENTRIES.filter(function(e) {
-        return (e.tags || []).indexOf(ACTIVE_TAG) !== -1;
+    function currentLang() {
+      return (document.body.classList.contains("lang-en") || document.body.classList.contains("lang-en")) ? "en" : "cn";
+    }
+
+    /* ── 为每篇文章预计算 Tag ID ── */
+    function computeEntryTags() {
+      ENTRY_TAG_IDS = {};
+      TAG_COUNTS = {};
+      ALL_ENTRIES.forEach(function(entry, i) {
+        var ids = TagResolver.resolveMany(entry.tags || []);
+        ENTRY_TAG_IDS[i] = ids;
+        ids.forEach(function(id) {
+          TAG_COUNTS[id] = (TAG_COUNTS[id] || 0) + 1;
+        });
       });
     }
 
-    /* ── 统计所有 tag 出现次数 ── */
-    function computeTags() {
-      var map = {};
-      ALL_ENTRIES.forEach(function(e) {
-        (e.tags || []).forEach(function(t) {
-          map[t] = (map[t] || 0) + 1;
-        });
+    /* ── 筛选后的条目 ── */
+    function filteredEntries() {
+      if (!ACTIVE_ID) return ALL_ENTRIES;
+      return ALL_ENTRIES.filter(function(entry, i) {
+        return (ENTRY_TAG_IDS[i] || []).indexOf(ACTIVE_ID) !== -1;
       });
-      ALL_TAGS = map;
     }
 
     /* ── 构建文章卡片 ── */
-    function buildEntryCard(entry) {
+    function buildEntryCard(entry, i) {
       var article = document.createElement("article");
       article.className = "journal-entry";
+      var lang = currentLang();
 
-      var tagsHtml = (entry.tags || []).map(function(tag, i) {
-        var tagEn = (entry.tagsEn && entry.tagsEn[i]) || tag;
-        return '<span class="journal-tag" data-en="' + escapeAttr(tagEn) + '" data-cn="' + escapeAttr(tag) + '" data-tag="' + escapeAttr(tag) + '">' + escapeHtml(tag) + '</span>';
+      var ids = ENTRY_TAG_IDS[i] || [];
+      var tagsHtml = ids.map(function(id) {
+        var name = TagResolver.displayName(id, lang);
+        return '<span class="journal-tag" data-tag-id="' + escapeAttr(id) + '" data-en="' + escapeAttr(TagResolver.displayName(id, 'en')) + '" data-cn="' + escapeAttr(TagResolver.displayName(id, 'cn')) + '">' + escapeHtml(name) + '</span>';
       }).join("\n            ");
 
       article.innerHTML =
@@ -350,12 +359,10 @@
         '        <p class="journal-entry-excerpt" data-en="' + escapeAttr(entry.excerptEn || entry.excerpt || '') + '" data-cn="' + escapeAttr(entry.excerpt || '') + '">' + escapeHtml(entry.excerpt || '') + '</p>\n' +
         '        <div class="journal-entry-tags">\n            ' + tagsHtml + '\n        </div>';
 
-      // 文章卡片里的 tag 点击 → 跳转到对应筛选
       article.querySelectorAll(".journal-tag").forEach(function(el) {
         el.addEventListener("click", function(e) {
           e.preventDefault();
-          var t = this.getAttribute("data-tag");
-          setFilter(t);
+          setFilter(this.getAttribute("data-tag-id"));
           window.scrollTo({ top: 0, behavior: "smooth" });
         });
       });
@@ -363,34 +370,37 @@
       return article;
     }
 
-    /* ── 渲染标签筛选栏 ── */
+    /* ── 筛选栏（Tag ID → tags.json Display Name）── */
     function renderTagBar() {
       var bar = document.getElementById("tagFilterBar");
-      var tags = Object.keys(ALL_TAGS).sort(function(a, b) {
-        return ALL_TAGS[b] - ALL_TAGS[a];
+      var ids = Object.keys(TAG_COUNTS).sort(function(a, b) {
+        return TAG_COUNTS[b] - TAG_COUNTS[a];
       });
+      var lang = currentLang();
 
-      if (tags.length === 0) { bar.innerHTML = ""; return; }
+      if (ids.length === 0) { bar.innerHTML = ""; return; }
 
-      var html = '<span class="tag-pill' + (ACTIVE_TAG ? "" : " active") + '" data-tag="">' +
+      var html = '<span class="tag-pill' + (ACTIVE_ID ? "" : " active") + '" data-tag-id="">' +
         '<span data-en="All" data-cn="全部">全部</span>' +
         '<span class="tag-count">' + ALL_ENTRIES.length + '</span></span>';
 
-      tags.forEach(function(t) {
-        var cls = "tag-pill" + (ACTIVE_TAG === t ? " active" : "");
-        html += '<span class="' + cls + '" data-tag="' + escapeAttr(t) + '">' +
-          escapeHtml(t) + '<span class="tag-count">' + ALL_TAGS[t] + '</span></span>';
+      ids.forEach(function(id) {
+        var name = TagResolver.displayName(id, lang);
+        var cls = "tag-pill" + (ACTIVE_ID === id ? " active" : "");
+        html += '<span class="' + cls + '" data-tag-id="' + escapeAttr(id) + '"' +
+          ' data-en="' + escapeAttr(TagResolver.displayName(id, 'en')) + '"' +
+          ' data-cn="' + escapeAttr(TagResolver.displayName(id, 'cn')) + '"' +
+          '>' + escapeHtml(name) + '<span class="tag-count">' + TAG_COUNTS[id] + '</span></span>';
       });
 
       bar.innerHTML = html;
 
       bar.querySelectorAll(".tag-pill").forEach(function(el) {
         el.addEventListener("click", function() {
-          setFilter(this.getAttribute("data-tag"));
+          setFilter(this.getAttribute("data-tag-id"));
         });
       });
 
-      // 语言适配
       applyCurrentLanguageTo(bar);
     }
 
@@ -408,24 +418,25 @@
       }
 
       emptyState.hidden = true;
-      entries.forEach(function(entry) {
-        container.appendChild(buildEntryCard(entry));
+      entries.forEach(function(entry, i) {
+        var globalIndex = ALL_ENTRIES.indexOf(entry);
+        container.appendChild(buildEntryCard(entry, globalIndex));
       });
       applyCurrentLanguageTo(container);
     }
 
-    /* ── 设置标签筛选 ── */
-    function setFilter(tag) {
-      ACTIVE_TAG = tag;
-      updateUrl(tag);
+    /* ── 设置标签筛选（ID 驱动）── */
+    function setFilter(id) {
+      ACTIVE_ID = id;
+      updateUrl(id);
       renderTagBar();
       renderEntries();
     }
 
-    /* ── URL 参数 ── */
-    function updateUrl(tag) {
+    /* ── URL 参数（使用 ID，非原始字符串）── */
+    function updateUrl(id) {
       var url = window.location.pathname.replace(/\/$/, "");
-      if (tag) url += "?tag=" + encodeURIComponent(tag);
+      if (id) url += "?tag=" + encodeURIComponent(id);
       window.history.replaceState(null, "", url);
     }
 
@@ -434,9 +445,9 @@
       return params.get("tag") || "";
     }
 
-    /* ── 语言适配 ── */
+    /* ── 语言适配（通用）── */
     function applyCurrentLanguageTo(container) {
-      var lang = document.body.classList.contains("lang-en") ? "en" : "cn";
+      var lang = currentLang();
       container.querySelectorAll("[data-en][data-cn]").forEach(function(el) {
         el.textContent = el.getAttribute("data-" + lang);
       });
@@ -449,29 +460,36 @@
     document.addEventListener("DOMContentLoaded", function() {
       var emptyState = document.getElementById("journalEmpty");
 
-      fetch("/journal/data/entries.json")
-        .then(function(res) {
-          if (!res.ok) throw new Error("entries.json " + res.status);
-          return res.json();
-        })
-        .then(function(data) {
-          ALL_ENTRIES = (data.entries || [])
-            .filter(function(e) { return e.published !== false; })
-            .sort(function(a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+      TagResolver.onReady(function() {
 
-          if (ALL_ENTRIES.length === 0) {
+        fetch("/journal/data/entries.json")
+          .then(function(res) {
+            if (!res.ok) throw new Error("entries.json " + res.status);
+            return res.json();
+          })
+          .then(function(data) {
+            ALL_ENTRIES = (data.entries || [])
+              .filter(function(e) { return e.published !== false; })
+              .sort(function(a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+
+            if (ALL_ENTRIES.length === 0) {
+              emptyState.hidden = false;
+              return;
+            }
+
+            computeEntryTags();
+            ACTIVE_ID = readUrlTag();
+            renderTagBar();
+            renderEntries();
+          })
+          .catch(function() {
             emptyState.hidden = false;
-            return;
-          }
+          });
 
-          computeTags();
-          ACTIVE_TAG = readUrlTag();
-          renderTagBar();
-          renderEntries();
-        })
-        .catch(function() {
-          emptyState.hidden = false;
-        });
+      });
+
+      // 启动加载 tags.json
+      TagResolver.load();
     });
   </script>
 
