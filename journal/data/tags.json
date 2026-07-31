@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "description": "ROUZHEN Tag Dictionary — Single Source of Truth for all tag-related modules",
+  "updated_at": "2026-07-31",
+
+  "categories": [
+    { "id": "cat-ai",     "cn": "AI",      "en": "AI",      "slug": "ai" },
+    { "id": "cat-nature", "cn": "自然",    "en": "Nature",  "slug": "nature" },
+    { "id": "cat-craft",  "cn": "创作",    "en": "Craft",   "slug": "craft" },
+    { "id": "cat-web",    "cn": "Web",     "en": "Web",     "slug": "web" }
+  ],
+
+  "series": [
+    { "id": "ser-ai-tools",    "cn": "AI 工具横评",  "en": "AI Tool Reviews",  "category": "cat-ai",     "slug": "ai-tool-reviews" },
+    { "id": "ser-rouzhen-lab", "cn": "柔真实验室",   "en": "Rouzhen Lab",      "category": "cat-nature", "slug": "rouzhen-lab" }
+  ],
+
+  "tags": [
+    { "id": "ai-general",    "type": "tag", "category": "cat-ai",     "slug": "ai",             "cn": "AI",             "en": "AI" },
+    { "id": "claude",        "type": "tag", "category": "cat-ai",     "slug": "claude",         "cn": "Claude",         "en": "Claude" },
+    { "id": "codebuddy",     "type": "tag", "category": "cat-ai",     "slug": "codebuddy",      "cn": "CodeBuddy",      "en": "CodeBuddy" },
+    { "id": "copilot",       "type": "tag", "category": "cat-ai",     "slug": "copilot",        "cn": "Copilot",        "en": "Copilot" },
+    { "id": "moss",          "type": "tag", "category": "cat-nature", "slug": "moss",           "cn": "苔藓",           "en": "Moss" },
+    { "id": "fog",           "type": "tag", "category": "cat-nature", "slug": "fog",            "cn": "云雾",           "en": "Fog" },
+    { "id": "ecology",       "type": "tag", "category": "cat-nature", "slug": "ecology",        "cn": "生态",           "en": "Ecology" },
+    { "id": "miniature",     "type": "tag", "category": "cat-nature", "slug": "miniature",      "cn": "微缩景观",       "en": "Miniature" },
+    { "id": "landscape",     "type": "tag", "category": "cat-nature", "slug": "landscape",      "cn": "造景",           "en": "Landscape" },
+    { "id": "cloudflare",    "type": "tag", "category": "cat-web",    "slug": "cloudflare",     "cn": "Cloudflare",     "en": "Cloudflare" },
+    { "id": "pages",         "type": "tag", "category": "cat-web",    "slug": "pages",          "cn": "Pages",          "en": "Pages" },
+    { "id": "worker",        "type": "tag", "category": "cat-web",    "slug": "worker",         "cn": "Worker",         "en": "Worker" },
+    { "id": "philosophy",    "type": "tag", "category": "cat-craft",  "slug": "philosophy",     "cn": "哲学",           "en": "Philosophy" },
+    { "id": "studio",        "type": "tag", "category": "cat-craft",  "slug": "studio",         "cn": "个人工作室",     "en": "Solo Studio" },
+    { "id": "creator",       "type": "tag", "category": "cat-craft",  "slug": "creator",        "cn": "创作者",         "en": "Creator" },
+    { "id": "content-os",    "type": "tag", "category": "cat-craft",  "slug": "content-os",     "cn": "Content OS",     "en": "Content OS" },
+    { "id": "nature-general","type": "tag", "category": "cat-nature", "slug": "nature",         "cn": "自然",           "en": "Nature" },
+    { "id": "craft-general", "type": "tag", "category": "cat-craft",  "slug": "craft",          "cn": "创作",           "en": "Creation" }
+  ],
+
+  "migration": {
+    "_note": "旧 tags_cn 值 → 新 tag ID 的映射，用于渐进迁移。Worker publish 时参考此表转换。",
+    "map": {
+      "AI": "ai-general",
+      "创作": "craft-general",
+      "自然": "nature-general",
+      "哲学": "philosophy",
+      "ROUZHEN": "studio",
+      "苔藓": "moss",
+      "云雾": "fog",
+      "生态": "ecology",
+      "微缩景观": "miniature",
+      "造景": "landscape",
+      "Cloudflare": "cloudflare",
+      "个人工作室": "studio",
+      "创作者": "creator",
+      "Content OS": "content-os",
+      "Creator System": "creator",
+      "Moss": "moss",
+      "Fog": "fog",
+      "Ecology": "ecology",
+      "Miniature": "miniature",
+      "Landscape": "landscape",
+      "Creation": "craft-general",
+      "Nature": "nature-general",
+      "Philosophy": "philosophy"
+    }
+  }
+}

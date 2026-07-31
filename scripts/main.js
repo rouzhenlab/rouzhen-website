@@ -1,73 +1,89 @@
+/* ────────────────────────────────────────────────────────────────
+   LanguageManager v1.0
+   集中式语言控制 — 取代分散的 body.classList.toggle 机制
+   ──────────────────────────────────────────────────────────────── */
+const LanguageManager = {
+  _lang: 'cn',
+  _listeners: [],
+
+  /** 自动检测并应用初始语言（page-lang > localStorage > browser） */
+  init() {
+    const pageLang = document.body.getAttribute('data-page-lang');
+    const savedLang = localStorage.getItem('rouzhen-lang');
+
+    if (pageLang) {
+      this._lang = pageLang;
+    } else if (savedLang) {
+      this._lang = savedLang;
+    } else {
+      const zh = ['zh-CN','zh-SG','zh','zh-Hans'];
+      const b = navigator.language || navigator.userLanguage || 'en';
+      this._lang = zh.some(c => b.startsWith(c)) ? 'cn' : 'en';
+    }
+    this._apply();
+  },
+
+  /** 返回当前语言 'cn' | 'en' */
+  get() {
+    return this._lang;
+  },
+
+  /** 切换语言并通知所有订阅者 */
+  set(lang) {
+    if (!lang || this._lang === lang) return;
+    this._lang = lang;
+    this._apply();
+    this._notify();
+  },
+
+  /** 注册语言变化监听器 */
+  subscribe(fn) {
+    this._listeners.push(fn);
+  },
+
+  /* ── 内部 ── */
+  _apply() {
+    const L = this._lang;
+    document.querySelectorAll('[data-en][data-cn]').forEach(el => {
+      el.textContent = el.getAttribute('data-' + L);
+    });
+    document.querySelectorAll('[data-en-href][data-cn-href]').forEach(el => {
+      el.setAttribute('href', el.getAttribute('data-' + L + '-href'));
+    });
+    document.querySelectorAll('.lang-btn[data-lang]').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-lang') === L);
+    });
+    document.body.classList.remove('lang-en','lang-cn');
+    document.body.classList.add('lang-' + L);
+    try { localStorage.setItem('rouzhen-lang', L); } catch(e) {}
+  },
+
+  _notify() {
+    this._listeners.forEach(fn => fn(this._lang));
+  }
+};
+
+/* ────────────────────────────────────────────────────────────────
+   主入口
+   ──────────────────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
-  // 提到最前面：setLanguage() 在页面加载时会立即被调用（见下方语言检测逻辑），
-  // 必须确保 updateNowModule 用到的这个变量在那之前就已经完成初始化，
-  // 否则 let 声明会因为"暂时性死区"直接报错（Cannot access before initialization）。
   let nowEntriesCache = null;
 
+  /* ── LanguageManager 初始化 ── */
+  LanguageManager.init();
+
+  /* ── 绑定所有 lang-btn（含 Home Hero 底部 + Journal nav） ── */
+  document.querySelectorAll('.lang-btn[data-lang]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      LanguageManager.set(btn.getAttribute('data-lang'));
+    });
+  });
+
+  /* ── Navigation ── */
   const header = document.getElementById('header');
   const navMenu = document.getElementById('navMenu');
   const menuToggle = document.getElementById('menuToggle');
   const navLinks = document.querySelectorAll('.nav-link');
-  const langBtns = document.querySelectorAll('.lang-btn');
-
-  function setLanguage(lang) {
-    const elements = document.querySelectorAll('[data-en][data-cn]');
-    elements.forEach(el => {
-      el.textContent = el.getAttribute('data-' + lang);
-    });
-
-    const hrefElements = document.querySelectorAll('[data-en-href][data-cn-href]');
-    hrefElements.forEach(el => {
-      el.setAttribute('href', el.getAttribute('data-' + lang + '-href'));
-    });
-
-    langBtns.forEach(btn => {
-      if (btn.getAttribute('data-lang') === lang) {
-        btn.classList.add('active');
-      } else {
-        btn.classList.remove('active');
-      }
-    });
-
-    document.body.classList.remove('lang-en', 'lang-cn');
-    document.body.classList.add('lang-' + lang);
-
-    try {
-      localStorage.setItem('rouzhen-lang', lang);
-    } catch (e) {}
-
-    updateNowModule(lang);
-  }
-
-  langBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const lang = btn.getAttribute('data-lang');
-      setLanguage(lang);
-    });
-  });
-
-  function detectLanguage() {
-    const zhLangCodes = ['zh-CN', 'zh-SG', 'zh', 'zh-Hans'];
-    const browserLang = navigator.language || navigator.userLanguage || 'en';
-    return zhLangCodes.some(code => browserLang.startsWith(code)) ? 'cn' : 'en';
-  }
-
-  // 优先级：页面声明语言 (data-page-lang) > localStorage > 浏览器语言检测
-  // 文章页通过 body data-page-lang 声明自身语言，确保跳转后语言状态一致
-  try {
-    const pageLang = document.body.getAttribute('data-page-lang');
-    const savedLang = localStorage.getItem('rouzhen-lang');
-    
-    if (pageLang) {
-      setLanguage(pageLang);
-    } else if (savedLang) {
-      setLanguage(savedLang);
-    } else {
-      setLanguage(detectLanguage());
-    }
-  } catch (e) {
-    setLanguage(detectLanguage());
-  }
 
   window.addEventListener('scroll', () => {
     if (window.scrollY > 50) {
@@ -114,7 +130,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ==================== Now / 停雲 时间入口 ====================
-  // entries.json 缓存变量已提到文件最前面声明，这里直接用
+
+  // 语言切换时自动更新 Now 模块（仅在 Home 页面有 #nowLatestEntry 时生效）
+  LanguageManager.subscribe(lang => updateNowModule(lang));
+  // init() 时还没有 subscriber，需要手动补偿一次初始调用
+  if (document.getElementById('nowLatestEntry')) {
+    updateNowModule(LanguageManager.get());
+  }
 
   async function updateNowModule(lang) {
     const linkEl = document.getElementById('nowLatestEntry');
