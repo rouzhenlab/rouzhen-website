@@ -1,4 +1,9 @@
 {
+  "meta": {
+    "lastUpdated": "2026-08-01",
+    "generator": "rouzhen-studio/sync-website"
+  },
+  "total": 1,
   "entries": [
     {
       "id": "the-free-battle-2",
@@ -24,137 +29,6 @@
       ],
       "published": true,
       "bilingual": true
-    },
-    {
-      "id": "the-free-battle-test",
-      "title": "免费大作战",
-      "titleEn": "The Free Battle",
-      "slug": "2026-08-01-the-free-battle-test",
-      "file": "entries/2026-08-01-the-free-battle-test.html",
-      "fileEn": "entries/2026-08-01-the-free-battle-test-en.html",
-      "date": "2026-08-01",
-      "excerpt": "没有团队。",
-      "excerptEn": "No large team.",
-      "tags": [
-        "studio",
-        "ai-general",
-        "content-os",
-        "creator",
-        "craft-general"
-      ],
-      "tagsEn": [
-        "studio",
-        "ai-general",
-        "content-os",
-        "creator",
-        "craft-general"
-      ],
-      "published": true,
-      "bilingual": true
-    },
-    {
-      "id": "the-free-battle",
-      "title": "免费大作战",
-      "titleEn": "The Free Battle",
-      "slug": "2026-07-31-the-free-battle",
-      "file": "entries/2026-07-31-the-free-battle.html",
-      "fileEn": "entries/2026-07-31-the-free-battle-en.html",
-      "date": "2026-07-31",
-      "excerpt": "没有团队。",
-      "excerptEn": "No large team.",
-      "tags": [
-        "ai-general",
-        "studio",
-        "content-os",
-        "craft-general"
-      ],
-      "tagsEn": [
-        "ai-general",
-        "studio",
-        "content-os",
-        "craft-general"
-      ],
-      "published": true,
-      "bilingual": true
-    },
-    {
-      "id": "2026-07-25",
-      "title": "免费大作战",
-      "titleEn": "The Free Battle",
-      "slug": "2026-07-31-2026-07-25",
-      "file": "entries/2026-07-31-2026-07-25.html",
-      "fileEn": "entries/2026-07-31-2026-07-25-en.html",
-      "date": "2026-07-31",
-      "excerpt": "没有团队。",
-      "excerptEn": "No large team.",
-      "tags": [
-        "ai-general",
-        "studio",
-        "content-os",
-        "craft-general",
-        "creator"
-      ],
-      "tagsEn": [
-        "ai-general",
-        "studio",
-        "content-os",
-        "craft-general",
-        "creator"
-      ],
-      "published": true,
-      "bilingual": true
-    },
-    {
-      "id": "ai-website",
-      "title": "我让 AI 帮我做了一个国际网站",
-      "titleEn": "I Asked AI to Help Me Build an International Website",
-      "slug": "2026-07-17-ai-website",
-      "file": "entries/2026-07-17-ai-website.html",
-      "fileEn": "entries/2026-07-17-ai-website-en.html",
-      "date": "2026-07-17",
-      "excerpt": "不是从完整的方案开始，而是从一个模糊的感觉里，慢慢把网站长出来。",
-      "excerptEn": "It did not begin with a complete plan. It began with a vague feeling that slowly became a website.",
-      "tags": [
-        "craft-general",
-        "nature-general",
-        "ai-general"
-      ],
-      "tagsEn": [
-        "craft-general",
-        "nature-general",
-        "ai-general"
-      ],
-      "published": true,
-      "bilingual": true
-    },
-    {
-      "id": "cloud-without-patent",
-      "title": "一根软管，一片苔藓，和一朵不会申请专利的云",
-      "titleEn": "A Tube, a Patch of Moss, and a Cloud Beyond Patents",
-      "slug": "2026-07-14-cloud-without-patent",
-      "file": "entries/2026-07-14-cloud-without-patent.html",
-      "fileEn": "entries/2026-07-14-cloud-without-patent-en.html",
-      "date": "2026-07-14",
-      "excerpt": "技术可以被学习，结构可以被复制。但审美，需要一点一点积累。",
-      "excerptEn": "Technology can be replicated. Structures can be reverse-engineered. Taste cannot.",
-      "tags": [
-        "craft-general",
-        "nature-general",
-        "philosophy"
-      ],
-      "tagsEn": [
-        "craft-general",
-        "nature-general",
-        "philosophy"
-      ],
-      "published": true,
-      "bilingual": true
     }
-  ],
-  "meta": {
-    "schema_version": 2,
-    "lastUpdated": "2026-08-01",
-    "description": "ROUZHEN Journal entries index",
-    "note": "Tag values migrated from legacy strings to canonical IDs. See docs/Tag-Audit-Report.md and tools/migrate_tags.py for details."
-  }
+  ]
 }
