@@ -277,6 +277,7 @@
     </section>
 
     <div class="tag-filter-bar" id="tagFilterBar"></div>
+    <div id="debugInfo" style="background:#fff3cd;border:1px solid #ffc107;padding:8px 12px;margin:0 auto var(--space-4);max-width:var(--container-narrow);font-family:monospace;font-size:12px;line-height:1.6;border-radius:4px;word-break:break-all;display:none;"></div>
 
     <section class="journal-content">
       <div class="journal-entries" id="journalEntries"></div>
@@ -345,6 +346,21 @@
 
     function formatDateDisplay(dateStr) {
       return (dateStr || "").replace(/-/g, ".");
+    }
+
+    function showDebug() {
+      var d = document.getElementById("debugInfo");
+      if (!d) return;
+      d.style.display = "block";
+      var sampleEntry = ALL_ENTRIES[0];
+      var sampleResolved = sampleEntry ? TagResolver.resolveMany(sampleEntry.tags || []) : [];
+      d.innerHTML =
+        "<b>TagResolver loaded:</b> " + TagResolver.isLoaded() +
+        " | <b>TAG_DICT size:</b> " + TagResolver._tagCount() +
+        " | <b>Entries:</b> " + ALL_ENTRIES.length +
+        "<br><b>TAG_COUNTS:</b> " + JSON.stringify(TAG_COUNTS) +
+        "<br><b>Entry[0] tags:</b> " + JSON.stringify(sampleEntry ? sampleEntry.tags : null) +
+        " → " + JSON.stringify(sampleResolved);
     }
 
     function currentLang() {
@@ -516,6 +532,7 @@
             ACTIVE_ID = readUrlTag();
             renderTagBar();
             renderEntries();
+            showDebug();
           })
           .catch(function() {
             emptyState.hidden = false;
