@@ -355,18 +355,13 @@
     function computeEntryTags() {
       ENTRY_TAG_IDS = {};
       TAG_COUNTS = {};
-      console.log('[DEBUG] computeEntryTags: entry count =', ALL_ENTRIES.length,
-        '| TagResolver loaded =', TagResolver.isLoaded());
       ALL_ENTRIES.forEach(function(entry, i) {
-        var raw = entry.tags || [];
-        var ids = TagResolver.resolveMany(raw);
-        console.log('[DEBUG] Entry #'+i, raw, '→', ids);
+        var ids = TagResolver.resolveMany(entry.tags || []);
         ENTRY_TAG_IDS[i] = ids;
         ids.forEach(function(id) {
           TAG_COUNTS[id] = (TAG_COUNTS[id] || 0) + 1;
         });
       });
-      console.log('[DEBUG] TAG_COUNTS =', JSON.stringify(TAG_COUNTS));
     }
 
     /* ── 筛选后的条目 ── */
@@ -417,8 +412,7 @@
       });
       var lang = currentLang();
 
-      console.log('[DEBUG] renderTagBar: ids =', ids, '| counts =', JSON.stringify(TAG_COUNTS));
-      if (ids.length === 0) { bar.innerHTML = ""; console.warn('[DEBUG] renderTagBar: NO TAGS, clearing bar'); return; }
+      if (ids.length === 0) { bar.innerHTML = ""; return; }
 
       var html = '<span class="tag-pill' + (ACTIVE_ID ? "" : " active") + '" data-tag-id="">' +
         '<span data-en="All" data-cn="全部">全部</span>' +
