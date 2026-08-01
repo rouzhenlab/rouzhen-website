@@ -6,6 +6,33 @@
   "total": 1,
   "entries": [
     {
+      "id": "the-free-battle-2000",
+      "title": "免费大作战",
+      "titleEn": "The Free Battle",
+      "slug": "2026-08-01-the-free-battle-2000",
+      "file": "entries/2026-08-01-the-free-battle-2000.html",
+      "fileEn": "entries/2026-08-01-the-free-battle-2000-en.html",
+      "date": "2026-08-01",
+      "excerpt": "没有团队。",
+      "excerptEn": "No large team.",
+      "tags": [
+        "studio",
+        "ai-general",
+        "content-os",
+        "creator",
+        "craft-general"
+      ],
+      "tagsEn": [
+        "studio",
+        "ai-general",
+        "content-os",
+        "creator",
+        "craft-general"
+      ],
+      "published": true,
+      "bilingual": true
+    },
+    {
       "id": "the-free-battle-2",
       "title": "免费大作战",
       "titleEn": "The Free Battle",
