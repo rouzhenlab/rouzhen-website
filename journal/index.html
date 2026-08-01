@@ -314,7 +314,7 @@
     }
 
     function currentLang() {
-      return (document.body.classList.contains("lang-en") || document.body.classList.contains("lang-en")) ? "en" : "cn";
+      return document.body.classList.contains("lang-en") ? "en" : "cn";
     }
 
     /* ── 为每篇文章预计算 Tag ID ── */

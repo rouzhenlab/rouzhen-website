@@ -65,9 +65,9 @@
       "#CreativeProcess": "craft-general",
       "Creation": "craft-general",
       "Nature": "nature-general",
-      "Philosophy": "philosophy"
+      "Philosophy": "philosophy",
+      "#AI创作": "ai-general"
     },
-    "_manual_review": ["#AI创作"],
-    "_note_v0.9": "#AI创作 为复合标签（ai-general + craft-general?），需人工确认后手动添加映射。不自动拆分。"
+    "_manual_review": []
   }
 }
