@@ -372,7 +372,7 @@
       ENTRY_TAG_IDS = {};
       TAG_COUNTS = {};
       ALL_ENTRIES.forEach(function(entry, i) {
-        var ids = TagResolver.resolveMany(entry.tags || []);
+        var ids = entry.tags || [];
         ENTRY_TAG_IDS[i] = ids;
         ids.forEach(function(id) {
           TAG_COUNTS[id] = (TAG_COUNTS[id] || 0) + 1;
