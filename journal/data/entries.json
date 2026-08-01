@@ -3,8 +3,33 @@
     "lastUpdated": "2026-08-01",
     "generator": "rouzhen-studio/sync-website"
   },
-  "total": 1,
+  "total": 2,
   "entries": [
+    {
+      "id": "the-free-battle-2",
+      "title": "免费大作战",
+      "titleEn": "The Free Battle",
+      "slug": "2026-08-01-the-free-battle-2",
+      "file": "entries/2026-08-01-the-free-battle-2.html",
+      "fileEn": "entries/2026-08-01-the-free-battle-2-en.html",
+      "date": "2026-08-01",
+      "excerpt": "没有团队。",
+      "excerptEn": "No large team.",
+      "tags": [
+        "ai-general",
+        "studio",
+        "content-os",
+        "craft-general"
+      ],
+      "tagsEn": [
+        "ai-general",
+        "studio",
+        "content-os",
+        "craft-general"
+      ],
+      "published": true,
+      "bilingual": true
+    },
     {
       "id": "the-free-battle-test",
       "title": "免费大作战",
@@ -27,31 +52,6 @@
         "ai-general",
         "content-os",
         "creator",
-        "craft-general"
-      ],
-      "published": true,
-      "bilingual": true
-    },
-    {
-      "id": "the-free-battle-2",
-      "title": "免费大作战",
-      "titleEn": "The Free Battle",
-      "slug": "2026-08-01-the-free-battle-2",
-      "file": "entries/2026-08-01-the-free-battle-2.html",
-      "fileEn": "entries/2026-08-01-the-free-battle-2-en.html",
-      "date": "2026-08-01",
-      "excerpt": "没有团队。",
-      "excerptEn": "No large team.",
-      "tags": [
-        "ai-general",
-        "studio",
-        "content-os",
-        "craft-general"
-      ],
-      "tagsEn": [
-        "ai-general",
-        "studio",
-        "content-os",
         "craft-general"
       ],
       "published": true,
