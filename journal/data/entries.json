@@ -1,10 +1,43 @@
 {
   "meta": {
-    "lastUpdated": "2026-08-01",
+    "lastUpdated": "2026-07-15",
     "generator": "rouzhen-studio/sync-website"
   },
   "total": 2,
   "entries": [
+    {
+      "id": "i-asked-ai-to-build-a-website-everything-started-with-free-tools",
+      "title": "我让 AI 帮我做了一个网站：一切免费",
+      "titleEn": "I Asked AI to Build a Website: Everything Started with Free Tools",
+      "slug": "2026-07-15-i-asked-ai-to-build-a-website-everything-started-with-free-tools",
+      "file": "entries/2026-07-15-i-asked-ai-to-build-a-website-everything-started-with-free-tools.html",
+      "fileEn": "entries/2026-07-15-i-asked-ai-to-build-a-website-everything-started-with-free-tools-en.html",
+      "date": "2026-07-15",
+      "excerpt": "没有团队。",
+      "excerptEn": "No team.",
+      "tags": [
+        "AI共创",
+        "创作系统",
+        "数字造物",
+        "品牌探索",
+        "#AI共创",
+        "#创作系统",
+        "ai-general",
+        "#CreativeSystem"
+      ],
+      "tagsEn": [
+        "AI共创",
+        "创作系统",
+        "数字造物",
+        "品牌探索",
+        "#AI共创",
+        "#创作系统",
+        "ai-general",
+        "#CreativeSystem"
+      ],
+      "published": true,
+      "bilingual": true
+    },
     {
       "id": "the-free-battle-2",
       "title": "免费大作战",
