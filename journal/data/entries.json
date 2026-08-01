@@ -11,17 +11,15 @@
       "excerpt": "没有团队。",
       "excerptEn": "No large team.",
       "tags": [
-        "#AI创作",
+        "ai-general",
         "studio",
         "content-os",
-        "ai-general",
         "craft-general"
       ],
       "tagsEn": [
-        "#AI创作",
+        "ai-general",
         "studio",
         "content-os",
-        "ai-general",
         "craft-general"
       ],
       "published": true,
@@ -38,20 +36,18 @@
       "excerpt": "没有团队。",
       "excerptEn": "No large team.",
       "tags": [
-        "studio",
         "ai-general",
+        "studio",
         "content-os",
-        "creator",
-        "#AI创作",
-        "craft-general"
+        "craft-general",
+        "creator"
       ],
       "tagsEn": [
-        "studio",
         "ai-general",
+        "studio",
         "content-os",
-        "creator",
-        "#AI创作",
-        "craft-general"
+        "craft-general",
+        "creator"
       ],
       "published": true,
       "bilingual": true
