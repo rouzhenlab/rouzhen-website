@@ -421,10 +421,11 @@
       ids.forEach(function(id) {
         var name = TagResolver.displayName(id, lang);
         var cls = "tag-pill" + (ACTIVE_ID === id ? " active" : "");
-        html += '<span class="' + cls + '" data-tag-id="' + escapeAttr(id) + '"' +
-          ' data-en="' + escapeAttr(TagResolver.displayName(id, 'en')) + '"' +
+        html += '<span class="' + cls + '" data-tag-id="' + escapeAttr(id) + '">' +
+          '<span data-en="' + escapeAttr(TagResolver.displayName(id, 'en')) + '"' +
           ' data-cn="' + escapeAttr(TagResolver.displayName(id, 'cn')) + '"' +
-          '>' + escapeHtml(name) + '<span class="tag-count">' + TAG_COUNTS[id] + '</span></span>';
+          '>' + escapeHtml(name) + '</span>' +
+          '<span class="tag-count">' + TAG_COUNTS[id] + '</span></span>';
       });
 
       bar.innerHTML = html;
