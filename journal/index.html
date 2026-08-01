@@ -47,14 +47,6 @@
       letter-spacing: 0.1em;
     }
 
-    /* Lang switch in page flow, top-right */
-    .lang-switch--inline {
-      position: absolute;
-      top: var(--space-6);
-      right: var(--space-6);
-      margin: 0;
-    }
-
     .journal-subtitle {
       font-family: var(--font-body);
       font-size: var(--space-4);
@@ -212,6 +204,44 @@
         margin-bottom: var(--space-5);
       }
     }
+
+    /* ── Bottom navigation — same pattern as article pages ── */
+    .journal-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-3);
+      max-width: var(--container-narrow);
+      margin: var(--space-6) auto;
+      padding: var(--space-5) var(--space-3);
+      border-top: 1px solid var(--color-border);
+    }
+
+    .journal-nav-back {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      text-decoration: none;
+      padding: var(--space-2) var(--space-3);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: transparent;
+    }
+
+    .journal-nav-back:hover {
+      color: var(--color-moss);
+      border-color: var(--color-moss);
+    }
+
+    @media (max-width: 640px) {
+      .journal-nav {
+        padding: var(--space-4) var(--space-3);
+      }
+    }
   </style>
 </head>
 <body>
@@ -244,11 +274,6 @@
     <section class="journal-header">
       <h1 class="journal-title" data-en="Journal" data-cn="札记">Journal</h1>
       <p class="journal-subtitle" data-en="Ecological archives — records of natural aesthetics exploration" data-cn="生态札记 — 记录自然美学的探索与思考">Ecological archives — records of natural aesthetics exploration</p>
-      <div class="lang-switch lang-switch--inline">
-        <button class="lang-btn" data-lang="cn">中文</button>
-        <span class="lang-sep">/</span>
-        <button class="lang-btn" data-lang="en">EN</button>
-      </div>
     </section>
 
     <div class="tag-filter-bar" id="tagFilterBar"></div>
@@ -259,6 +284,15 @@
         <p class="journal-empty-text" data-en="No entries yet. Check back soon." data-cn="暂无文章，敬请期待。">暂无文章，敬请期待。</p>
       </div>
     </section>
+
+    <div class="journal-nav">
+      <a href="/journal/index.html" class="journal-nav-back" data-en="← Back to Journal" data-cn="← 返回札记">← 返回札记</a>
+      <div class="lang-switch">
+        <button class="lang-btn" data-lang="cn">中文</button>
+        <span class="lang-sep">/</span>
+        <button class="lang-btn" data-lang="en">EN</button>
+      </div>
+    </div>
   </main>
 
   <footer class="footer">
