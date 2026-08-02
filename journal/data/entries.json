@@ -1,8 +1,28 @@
 {
   "meta": {
-    "lastUpdated": "",
+    "lastUpdated": "2026-08-02",
     "generator": "rouzhen-studio/sync-website"
   },
   "total": 0,
-  "entries": []
+  "entries": [
+    {
+      "id": "i-asked-ai-to-build-a-website-everything-started-with-free-tools",
+      "title": "我让 AI 帮我做了一个网站",
+      "titleEn": "I Asked AI to Build a Website: Everything Started with Free Tools",
+      "slug": "2026-08-02-i-asked-ai-to-build-a-website-everything-started-with-free-tools",
+      "file": "entries/2026-08-02-i-asked-ai-to-build-a-website-everything-started-with-free-tools.html",
+      "fileEn": "entries/2026-08-02-i-asked-ai-to-build-a-website-everything-started-with-free-tools-en.html",
+      "date": "2026-08-02",
+      "excerpt": "没有团队。",
+      "excerptEn": "No team.",
+      "tags": [
+        "ai-collaboration"
+      ],
+      "tagsEn": [
+        "ai-collaboration"
+      ],
+      "published": true,
+      "bilingual": true
+    }
+  ]
 }
