@@ -1,375 +1,532 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Journal · 日志</title>
-<style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-:root {
-  --bg: #f9f8f6;
-  --card-bg: #ffffff;
-  --text: #2c2c2c;
-  --text-secondary: #6b6b6b;
-  --border: #e8e5df;
-  --accent: #d4a574;
-  --accent-hover: #c08a52;
-  --tag-bg: #f0ebe3;
-  --tag-text: #6b5b4e;
-  --tag-active-bg: #d4a574;
-  --tag-active-text: #ffffff;
-  --radius: 12px;
-}
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans SC", "Noto Sans JP", sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  line-height: 1.7;
-  min-height: 100vh;
-}
-.container { max-width: 800px; margin: 0 auto; padding: 48px 24px 64px; }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="ROUZHEN Journal — 生态札记，记录自然美学的探索与思考">
+  <meta name="keywords" content="ROUZHEN Journal, 自然美学, 苔藓, 生态札记">
+  <meta name="author" content="ROUZHEN">
 
-/* Header */
-.header { margin-bottom: 48px; }
-.header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
-.header-sub { font-size: 15px; color: var(--text-secondary); }
-.lang-toggle {
-  display: flex; gap: 2px; background: var(--border); border-radius: 8px; padding: 3px;
-}
-.lang-btn {
-  padding: 6px 14px; border: none; background: transparent; font-size: 13px; font-weight: 500;
-  cursor: pointer; border-radius: 6px; color: var(--text-secondary); transition: all 0.2s;
-}
-.lang-btn.active { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ROUZHEN Journal — 生态札记">
+  <meta property="og:description" content="记录自然美学的探索与思考">
+  <meta property="og:url" content="https://rouzhen.pages.dev/journal/">
+  <meta property="og:image" content="https://pub-d925d0cb281a418d91ad6617fc10bc86.r2.dev/journal/moss-stone-fog-1.jpg.jpg">
+  <link rel="canonical" href="https://rouzhen.pages.dev/journal/">
 
-/* Tag Cloud */
-.tag-cloud {
-  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 40px; padding-bottom: 32px;
-  border-bottom: 1px solid var(--border);
-}
-.tag-pill {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 14px; border-radius: 20px; font-size: 14px; font-weight: 500;
-  background: var(--tag-bg); color: var(--tag-text); text-decoration: none;
-  transition: all 0.2s;
-}
-.tag-pill:hover { background: #e8ded0; }
-.tag-pill.active { background: var(--tag-active-bg); color: var(--tag-active-text); }
-.tag-count { font-size: 12px; opacity: 0.7; }
-.tag-clear { color: var(--text-secondary); font-size: 13px; align-self: center; }
-.tag-clear:hover { color: var(--text); }
+  <link rel="icon" type="image/svg+xml" href="/assets/svg/favicon.svg">
 
-/* Article Cards */
-.articles { display: flex; flex-direction: column; gap: 24px; }
-.article-card {
-  background: var(--card-bg); border-radius: var(--radius);
-  padding: 28px 32px; border: 1px solid var(--border);
-  transition: box-shadow 0.2s;
-}
-.article-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.05); }
-.article-card .meta { font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
-.article-card h2 {
-  font-size: 20px; font-weight: 650; margin-bottom: 8px; line-height: 1.4;
-}
-.article-card h2 a { color: var(--text); text-decoration: none; }
-.article-card h2 a:hover { color: var(--accent); }
-.article-card .abstract {
-  font-size: 15px; color: var(--text-secondary); margin-bottom: 14px;
-  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.article-card .card-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-.article-card .card-tags .mini-tag {
-  font-size: 12px; padding: 3px 10px; border-radius: 12px;
-  background: var(--tag-bg); color: var(--tag-text);
-  text-decoration: none; transition: all 0.2s;
-}
-.article-card .card-tags .mini-tag:hover { background: var(--accent); color: #fff; }
+  <title>Journal — ROUZHEN</title>
 
-/* States */
-.empty-state { text-align: center; padding: 64px 24px; color: var(--text-secondary); }
-.empty-state p { font-size: 16px; margin-bottom: 4px; }
-.empty-state .sub { font-size: 14px; opacity: 0.7; }
-.loading { text-align: center; padding: 64px 24px; color: var(--text-secondary); }
+  <!-- Styles -->
+  <link rel="stylesheet" href="/styles/variables.css">
+  <link rel="stylesheet" href="/styles/typography.css">
+  <link rel="stylesheet" href="/styles/layout.css">
+  <link rel="stylesheet" href="/styles/animation.css">
+  <link rel="stylesheet" href="/components/Navigation/Navigation.css">
+  <link rel="stylesheet" href="/components/Footer/Footer.css">
 
-/* Footer */
-.footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); text-align: center; }
-.footer a { color: var(--text-secondary); text-decoration: none; font-size: 14px; }
-.footer a:hover { color: var(--text); }
-
-@media (max-width: 600px) {
-  .container { padding: 28px 16px 48px; }
-  .header h1 { font-size: 24px; }
-  .article-card { padding: 20px; }
-}
-</style>
-</head>
-<body>
-<div class="container">
-  <header class="header">
-    <div class="header-top">
-      <h1 data-i18n="title">Journal · 日志</h1>
-      <div class="lang-toggle">
-        <button class="lang-btn active" data-lang="zh" onclick="setLang('zh')">中</button>
-        <button class="lang-btn" data-lang="en" onclick="setLang('en')">EN</button>
-      </div>
-    </div>
-    <p class="header-sub" data-i18n="subtitle">Writing, thinking, creating.</p>
-  </header>
-
-  <div id="tag-cloud" class="tag-cloud" style="display:none"></div>
-
-  <div id="articles" class="articles">
-    <div class="loading">Loading…</div>
-  </div>
-
-  <footer class="footer">
-    <a href="/">Rouzhen Studio</a>
-  </footer>
-</div>
-
-<script>
-/* ═══════════════════════════════════════════════════════════════════
-   Clean Tag System — single-source-of-truth: tags.json
-   
-   Data flow:
-     tags.json (id + cn + en)  ──►  tagMap = { id: {cn, en} }
-     entries.json (tags[], tagsEn[])  ──►  Tag IDs
-     
-   Rendering:
-     Page language toggle → all tag names follow page lang
-     Tag filter ?tag=<TagID> → match against tags || tagsEn
-   ═══════════════════════════════════════════════════════════════════ */
-
-let entries = [];
-let tagMap = {};       // tagId → { cn, en }
-let tagIds = [];       // ordered tag IDs (for tag cloud)
-let pageLang = 'zh';
-let activeTag = null;  // current filter Tag ID
-
-const i18n = {
-  zh: { title: 'Journal · 日志', subtitle: '写作、思考、创作。', loading: '加载中…',
-    noArticles: '暂无文章', noArticlesSub: '敬请期待',
-    noMatch: '没有匹配的文章', noMatchSub: '换个标签试试？',
-    allTags: '全部' },
-  en: { title: 'Journal', subtitle: 'Writing, thinking, creating.', loading: 'Loading…',
-    noArticles: 'No articles yet', noArticlesSub: 'Stay tuned.',
-    noMatch: 'No matching articles', noMatchSub: 'Try another tag?',
-    allTags: 'All' }
-};
-
-/* ── Init ──────────────────────────────────────────────────────── */
-async function init() {
-  try {
-    const [entriesResp, tagsResp] = await Promise.all([
-      fetch('data/entries.json', { cache: 'no-cache' }),
-      fetch('data/tags.json', { cache: 'no-cache' })
-    ]);
-
-    if (!entriesResp.ok || !tagsResp.ok) throw new Error('Failed to load data');
-
-    const entriesData = await entriesResp.json();
-    const tagsData = await tagsResp.json();
-
-    entries = (entriesData.entries || []).filter(e => e.published !== false);
-    buildTagMap(tagsData);
-
-    // URL param ?tag=
-    const params = new URLSearchParams(window.location.search);
-    activeTag = params.get('tag') || null;
-
-    render();
-  } catch (err) {
-    console.error('Journal init failed:', err);
-    document.getElementById('articles').innerHTML =
-      '<div class="empty-state"><p>加载失败</p><p class="sub">请稍后重试</p></div>';
-  }
-}
-
-/* ── Tag Map ───────────────────────────────────────────────────── */
-function buildTagMap(tagsData) {
-  const tags = tagsData.tags || [];
-  tagIds = [];
-  for (const t of tags) {
-    if (t.type === 'category') continue; // skip categories for now
-    tagMap[t.id] = { cn: t.cn || t.id, en: t.en || t.id };
-    tagIds.push(t.id);
-  }
-
-  // Also add migration map entries (fallback for old display-name refs)
-  const migrationMap = (tagsData.migration && tagsData.migration.map) || {};
-  for (const [displayName, tagId] of Object.entries(migrationMap)) {
-    if (!tagMap[tagId]) {
-      tagMap[tagId] = { cn: displayName, en: tagId };
-      if (!tagIds.includes(tagId)) tagIds.push(tagId);
+  <style>
+    /* Journal Specific Styles */
+    .journal-header {
+      padding: var(--space-10) var(--space-3) var(--space-6);
+      text-align: center;
+      min-height: 30vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      position: relative;
     }
-  }
-}
 
-function resolveTagDisplay(tagId) {
-  const def = tagMap[tagId];
-  if (!def) return tagId;
-  return pageLang === 'en' ? def.en : def.cn;
-}
+    .journal-title {
+      font-family: var(--font-heading);
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-4);
+      letter-spacing: 0.1em;
+    }
 
-/* ── Render ────────────────────────────────────────────────────── */
-function render() {
-  // Sort: latest first
-  const sorted = [...entries].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    .journal-subtitle {
+      font-family: var(--font-body);
+      font-size: var(--space-4);
+      color: var(--color-text-secondary);
+      max-width: var(--container-narrow);
+      line-height: 1.8;
+    }
 
-  // Filter
-  let filtered = sorted;
-  if (activeTag) {
-    // If activeTag is a display name, try to resolve to Tag ID
-    let resolvedTag = activeTag;
-    for (const [id, def] of Object.entries(tagMap)) {
-      if (def.cn === activeTag || def.en === activeTag) {
-        resolvedTag = id;
-        break;
+    /* ── Tag Filter Bar ── */
+    .tag-filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: var(--space-2);
+      max-width: var(--container-narrow);
+      margin: 0 auto var(--space-6);
+      padding: 0 var(--space-3);
+    }
+
+    .tag-filter-bar:empty {
+      display: none;
+    }
+
+    .tag-pill {
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      color: var(--color-moss);
+      background: transparent;
+      padding: var(--space-1) var(--space-3);
+      border: 1px solid var(--color-moss);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      user-select: none;
+      transition: background var(--transition-fast), color var(--transition-fast);
+    }
+
+    .tag-pill:hover {
+      background: rgba(107, 124, 94, 0.06);
+    }
+
+    .tag-pill.active {
+      background: var(--color-moss);
+      color: var(--color-text-light);
+    }
+
+    .tag-count {
+      font-size: 0.75rem;
+      opacity: 0.7;
+      margin-left: 2px;
+    }
+
+    .tag-pill.active .tag-count {
+      opacity: 0.85;
+    }
+
+    /* ── Journal Content ── */
+    .journal-content {
+      padding: 0 var(--space-3) var(--space-10);
+      max-width: var(--container-max);
+      margin: 0 auto;
+    }
+
+    .journal-entries {
+      display: grid;
+      gap: var(--space-6);
+      max-width: var(--container-narrow);
+      margin: 0 auto;
+    }
+
+    .journal-entry {
+      border-bottom: 1px solid var(--color-border);
+      padding-bottom: var(--space-6);
+      transition: opacity var(--transition-base);
+    }
+
+    .journal-entry:hover {
+      opacity: 0.8;
+    }
+
+    .journal-entry-date {
+      font-family: var(--font-body);
+      font-size: var(--space-3);
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-2);
+      letter-spacing: 0.05em;
+    }
+
+    .journal-entry-title {
+      font-family: var(--font-heading);
+      font-size: clamp(1.25rem, 3vw, 1.75rem);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-3);
+      text-decoration: none;
+      display: block;
+    }
+
+    .journal-entry-title:hover {
+      color: var(--color-moss);
+    }
+
+    .journal-entry-excerpt {
+      font-family: var(--font-body);
+      font-size: var(--space-3);
+      color: var(--color-text-secondary);
+      line-height: 1.8;
+    }
+
+    .journal-entry-tags {
+      display: flex;
+      gap: var(--space-2);
+      margin-top: var(--space-3);
+      flex-wrap: wrap;
+    }
+
+    .journal-tag {
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      color: var(--color-moss);
+      padding: var(--space-1) var(--space-2);
+      border: 1px solid var(--color-moss);
+      border-radius: var(--radius-sm);
+      background: transparent;
+      cursor: pointer;
+      transition: background var(--transition-fast), color var(--transition-fast);
+    }
+
+    .journal-tag:hover {
+      background: rgba(107, 124, 94, 0.06);
+    }
+
+    .journal-empty {
+      text-align: center;
+      padding: var(--space-10) var(--space-3);
+      color: var(--color-text-muted);
+    }
+
+    .journal-empty-text {
+      font-family: var(--font-body);
+      font-size: var(--space-4);
+      line-height: 1.8;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .journal-header {
+        padding: var(--space-8) var(--space-3) var(--space-5);
+        min-height: 25vh;
+      }
+
+      .journal-content {
+        padding: 0 var(--space-3) var(--space-8);
+      }
+
+      .tag-filter-bar {
+        margin-bottom: var(--space-5);
       }
     }
-    filtered = sorted.filter(e => {
-      const eTags = (e.tags || []).concat(e.tagsEn || []);
-      return eTags.includes(resolvedTag);
+
+    /* ── Bottom navigation — same pattern as article pages ── */
+    .journal-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-3);
+      max-width: var(--container-narrow);
+      margin: var(--space-6) auto;
+      padding: var(--space-5) var(--space-3);
+      border-top: 1px solid var(--color-border);
+    }
+
+    .journal-nav-back {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      text-decoration: none;
+      padding: var(--space-2) var(--space-3);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: transparent;
+    }
+
+    .journal-nav-back:hover {
+      color: var(--color-moss);
+      border-color: var(--color-moss);
+    }
+
+    @media (max-width: 640px) {
+      .journal-nav {
+        padding: var(--space-4) var(--space-3);
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header" id="header">
+    <nav class="navbar">
+      <div class="nav-logo">
+        <a href="/" aria-label="ROUZHEN 首页">
+          <span class="nav-wave">~</span>
+        </a>
+      </div>
+      <ul class="nav-menu" id="navMenu">
+        <li><a href="/" class="nav-link" data-en="Home" data-cn="首页">Home</a></li>
+        <li><a href="/#philosophy" class="nav-link" data-en="Philosophy" data-cn="理念">Philosophy</a></li>
+        <li><a href="/#story" class="nav-link" data-en="Story" data-cn="故事">Story</a></li>
+        <li><a href="/#collections" class="nav-link" data-en="Collections" data-cn="系列">Collections</a></li>
+        <li><a href="/#lab" class="nav-link" data-en="Lab" data-cn="实验">Lab</a></li>
+        <li><a href="/journal/index.html" class="nav-link active" data-en="Journal" data-cn="札记">Journal</a></li>
+        <li><a href="/#contact" class="nav-link" data-en="Contact" data-cn="联系">Contact</a></li>
+      </ul>
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="journal-header">
+      <h1 class="journal-title" data-en="Journal" data-cn="札记">Journal</h1>
+      <p class="journal-subtitle" data-en="Ecological archives — records of natural aesthetics exploration" data-cn="生态札记 — 记录自然美学的探索与思考">Ecological archives �[...]
+    </section>
+
+    <div class="tag-filter-bar" id="tagFilterBar"></div>
+
+    <section class="journal-content">
+      <div class="journal-entries" id="journalEntries"></div>
+      <div class="journal-empty" id="journalEmpty" hidden>
+        <p class="journal-empty-text" data-en="No entries yet. Check back soon." data-cn="暂无文章，敬请期待。">暂无文章，敬请期待。</p>
+      </div>
+    </section>
+
+    <div class="journal-nav">
+      <a href="/journal/index.html" class="journal-nav-back" data-en="← Back to Journal" data-cn="← 返回札记">← 返回札记</a>
+      <div class="lang-switch">
+        <button class="lang-btn" data-lang="cn">中文</button>
+        <span class="lang-sep">/</span>
+        <button class="lang-btn" data-lang="en">EN</button>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <div class="footer-logo">
+            <img src="/assets/svg/logo-white-en.svg" alt="ROUZHEN" class="footer-logo-en">
+            <img src="/assets/svg/logo-white-cn.svg" alt="柔眞" class="footer-logo-cn">
+          </div>
+          <p class="footer-tagline" data-en="Between Cloud & Moss" data-cn="云～苔　之　间">Between Cloud & Moss</p>
+        </div>
+        <nav class="footer-links">
+          <a href="/" class="footer-link" data-en="Home" data-cn="首页">Home</a>
+          <a href="/#philosophy" class="footer-link" data-en="Philosophy" data-cn="理念">Philosophy</a>
+          <a href="/#collections" class="footer-link" data-en="Collections" data-cn="系列">Collections</a>
+          <a href="/journal/index.html" class="footer-link" data-en="Journal" data-cn="札记">Journal</a>
+          <a href="/#contact" class="footer-link" data-en="Contact" data-cn="联系">Contact</a>
+        </nav>
+        <div class="footer-bottom">
+          <p class="footer-copyright">© 2026 ROUZHEN</p>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="/scripts/main.js"></script>
+  <script src="/scripts/tags.js"></script>
+  <script>
+    // Journal Entry Loader —— v0.10.0 (Tag-resolved)
+    // Phase 2: 标签渲染/筛选全部通过 TagResolver → tags.json 驱动
+    // ── URL: ?tag={id}  ── Display: tags.json[cn|en]
+    // ── 未知 Tag → console.warn + 显示原始值（graceful fallback）
+
+    var ALL_ENTRIES = [];
+    var ACTIVE_ID = "";       // 当前筛选的 Tag ID（非原始字符串）
+    var ENTRY_TAG_IDS = {};  // { entryIndex: [id, ...] }  预计算的已解析标签 ID
+    var TAG_COUNTS = {};     // { id: count }  用于筛选栏排序
+
+    function escapeHtml(str) {
+      var div = document.createElement("div");
+      div.textContent = str || "";
+      return div.innerHTML;
+    }
+
+    function escapeAttr(str) {
+      return String(str).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
+
+    function formatDateDisplay(dateStr) {
+      return (dateStr || "").replace(/-/g, ".");
+    }
+
+    function currentLang() {
+      return document.body.classList.contains("lang-en") ? "en" : "cn";
+    }
+
+    /* ── 为每篇文章预计算 Tag ID ── */
+    function computeEntryTags() {
+      ENTRY_TAG_IDS = {};
+      TAG_COUNTS = {};
+      ALL_ENTRIES.forEach(function(entry, i) {
+        var ids = TagResolver.resolveMany(entry.tags || []);
+        ENTRY_TAG_IDS[i] = ids;
+        ids.forEach(function(id) {
+          TAG_COUNTS[id] = (TAG_COUNTS[id] || 0) + 1;
+        });
+      });
+    }
+
+    /* ── 筛选后的条目 ── */
+    function filteredEntries() {
+      if (!ACTIVE_ID) return ALL_ENTRIES;
+      return ALL_ENTRIES.filter(function(entry, i) {
+        return (ENTRY_TAG_IDS[i] || []).indexOf(ACTIVE_ID) !== -1;
+      });
+    }
+
+    /* ── 构建文章卡片 ── */
+    function buildEntryCard(entry, i) {
+      var article = document.createElement("article");
+      article.className = "journal-entry";
+      var lang = currentLang();
+
+      var ids = ENTRY_TAG_IDS[i] || [];
+      var tagsHtml = ids.map(function(id) {
+        var name = TagResolver.displayName(id, lang);
+        return '<span class="journal-tag" data-tag-id="' + escapeAttr(id) + '" data-en="' + escapeAttr(TagResolver.displayName(id, 'en')) + '" data-cn="' + escapeAttr(TagResolver.displayName(id, 'cn')) + '">' + escapeHtml(name) + '</span>';
+      }).join("\n            ");
+
+      article.innerHTML =
+        '<div class="journal-entry-date">' + formatDateDisplay(entry.date) + '</div>\n' +
+        '        <a href="/journal/' + escapeAttr(entry.file) + '" class="journal-entry-title"\n' +
+        '           data-cn-href="/journal/' + escapeAttr(entry.file) + '"\n' +
+        '           data-en-href="/journal/' + escapeAttr(entry.fileEn || entry.file) + '"\n' +
+        '           data-en="' + escapeAttr(entry.titleEn) + '" data-cn="' + escapeAttr(entry.title) + '">' + escapeHtml(entry.title) + '</a>\n' +
+        '        <p class="journal-entry-excerpt" data-en="' + escapeAttr(entry.excerptEn || entry.excerpt || '') + '" data-cn="' + escapeAttr(entry.excerpt || '') + '">' + escapeHtml(entry.excer[...]) +
+        '        <div class="journal-entry-tags">\n            ' + tagsHtml + '\n        </div>';
+
+      article.querySelectorAll(".journal-tag").forEach(function(el) {
+        el.addEventListener("click", function(e) {
+          e.preventDefault();
+          setFilter(this.getAttribute("data-tag-id"));
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+      });
+
+      return article;
+    }
+
+    /* ── 筛选栏（Tag ID → tags.json Display Name）── */
+    function renderTagBar() {
+      var bar = document.getElementById("tagFilterBar");
+      var ids = Object.keys(TAG_COUNTS).sort(function(a, b) {
+        return TAG_COUNTS[b] - TAG_COUNTS[a];
+      });
+      var lang = currentLang();
+
+      if (ids.length === 0) { bar.innerHTML = ""; return; }
+
+      var html = '<span class="tag-pill' + (ACTIVE_ID ? "" : " active") + '" data-tag-id="">' +
+        '<span data-en="All" data-cn="全部">全部</span>' +
+        '<span class="tag-count">' + ALL_ENTRIES.length + '</span></span>';
+
+      ids.forEach(function(id) {
+        var name = TagResolver.displayName(id, lang);
+        var cls = "tag-pill" + (ACTIVE_ID === id ? " active" : "");
+        html += '<span class="' + cls + '" data-tag-id="' + escapeAttr(id) + '">' +
+          '<span data-en="' + escapeAttr(TagResolver.displayName(id, 'en')) + '"' +
+          ' data-cn="' + escapeAttr(TagResolver.displayName(id, 'cn')) + '"' +
+          '>' + escapeHtml(name) + '</span>' +
+          '<span class="tag-count">' + TAG_COUNTS[id] + '</span></span>';
+      });
+
+      bar.innerHTML = html;
+
+      bar.querySelectorAll(".tag-pill").forEach(function(el) {
+        el.addEventListener("click", function() {
+          setFilter(this.getAttribute("data-tag-id"));
+        });
+      });
+
+      applyCurrentLanguageTo(bar);
+    }
+
+    /* ── 渲染文章列表 ── */
+    function renderEntries() {
+      var container = document.getElementById("journalEntries");
+      var emptyState = document.getElementById("journalEmpty");
+      var entries = filteredEntries();
+
+      container.innerHTML = "";
+
+      if (entries.length === 0) {
+        emptyState.hidden = false;
+        return;
+      }
+
+      emptyState.hidden = true;
+      entries.forEach(function(entry, i) {
+        var globalIndex = ALL_ENTRIES.indexOf(entry);
+        container.appendChild(buildEntryCard(entry, globalIndex));
+      });
+      applyCurrentLanguageTo(container);
+    }
+
+    /* ── 设置标签筛选（ID 驱动）── */
+    function setFilter(id) {
+      ACTIVE_ID = id;
+      updateUrl(id);
+      renderTagBar();
+      renderEntries();
+    }
+
+    /* ── URL 参数（使用 ID，非原始字符串）── */
+    function updateUrl(id) {
+      var url = window.location.pathname.replace(/\/$/, "");
+      if (id) url += "?tag=" + encodeURIComponent(id);
+      window.history.replaceState(null, "", url);
+    }
+
+    function readUrlTag() {
+      var params = new URLSearchParams(window.location.search);
+      return params.get("tag") || "";
+    }
+
+    /* ── 语言适���（通用）── */
+    function applyCurrentLanguageTo(container) {
+      var lang = currentLang();
+      container.querySelectorAll("[data-en][data-cn]").forEach(function(el) {
+        el.textContent = el.getAttribute("data-" + lang);
+      });
+      container.querySelectorAll("[data-en-href][data-cn-href]").forEach(function(el) {
+        el.setAttribute("href", el.getAttribute("data-" + lang + "-href"));
+      });
+    }
+
+    /* ── 入口 ── */
+    document.addEventListener("DOMContentLoaded", function() {
+      var emptyState = document.getElementById("journalEmpty");
+
+      TagResolver.onReady(function() {
+
+        fetch("/journal/data/entries.json")
+          .then(function(res) {
+            if (!res.ok) throw new Error("entries.json " + res.status);
+            return res.json();
+          })
+          .then(function(data) {
+            ALL_ENTRIES = (data.entries || [])
+              .filter(function(e) { return e.published !== false; })
+              .sort(function(a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+
+            if (ALL_ENTRIES.length === 0) {
+              emptyState.hidden = false;
+              return;
+            }
+
+            computeEntryTags();
+            ACTIVE_ID = readUrlTag();
+            renderTagBar();
+            renderEntries();
+          })
+          .catch(function() {
+            emptyState.hidden = false;
+          });
+
+      });
+
+      // 启动加载 tags.json
+      TagResolver.load();
     });
-  }
+  </script>
 
-  renderTagCloud(sorted);
-  renderArticles(filtered);
-  updateI18n();
-}
-
-/* ── Tag Cloud ─────────────────────────────────────────────────── */
-function renderTagCloud(allEntries) {
-  const cloud = document.getElementById('tag-cloud');
-  
-  // Count: articles where Tag ID appears in tags OR tagsEn
-  const counts = {};
-  for (const tagId of tagIds) {
-    counts[tagId] = allEntries.filter(e => {
-      const eTags = (e.tags || []).concat(e.tagsEn || []);
-      return eTags.includes(tagId);
-    }).length;
-  }
-
-  // Only show tags with articles
-  const visible = tagIds.filter(id => counts[id] > 0);
-  if (visible.length === 0) { cloud.style.display = 'none'; return; }
-
-  cloud.style.display = 'flex';
-  cloud.innerHTML = '';
-
-  // "All" button
-  const allLink = document.createElement('a');
-  allLink.href = '?';
-  allLink.className = 'tag-pill' + (!activeTag ? ' active' : '');
-  allLink.textContent = i18n[pageLang].allTags;
-  allLink.onclick = e => { e.preventDefault(); setActiveTag(null); };
-  cloud.appendChild(allLink);
-
-  for (const tagId of visible) {
-    const link = document.createElement('a');
-    link.href = '?tag=' + encodeURIComponent(tagId);
-    link.className = 'tag-pill' + (activeTag === tagId ? ' active' : '');
-    link.onclick = e => { e.preventDefault(); setActiveTag(tagId); };
-    link.innerHTML = resolveTagDisplay(tagId) +
-      '<span class="tag-count">' + counts[tagId] + '</span>';
-    cloud.appendChild(link);
-  }
-}
-
-/* ── Article Cards ─────────────────────────────────────────────── */
-function renderArticles(filtered) {
-  const container = document.getElementById('articles');
-
-  if (filtered.length === 0) {
-    container.innerHTML = entries.length === 0
-      ? `<div class="empty-state"><p>${i18n[pageLang].noArticles}</p><p class="sub">${i18n[pageLang].noArticlesSub}</p></div>`
-      : `<div class="empty-state"><p>${i18n[pageLang].noMatch}</p><p class="sub">${i18n[pageLang].noMatchSub}</p></div>`;
-    return;
-  }
-
-  container.innerHTML = filtered.map(e => {
-    const title = pageLang === 'en' ? (e.titleEn || e.title) : e.title;
-    const abstract = pageLang === 'en'
-      ? (e.abstractEn || e.abstract || e.excerptEn || e.excerpt || '')
-      : (e.abstract || e.excerpt || '');
-    const date = formatDate(e.date, pageLang);
-    const articleFile = e.file || e.fileEn || `entries/${e.slug}.html`;
-    const articleUrl = pageLang === 'en' && e.fileEn ? e.fileEn : (e.file || articleFile);
-
-    // Tags: pick based on article lang, display in page lang
-    const tagField = e.lang === 'en' ? (e.tagsEn || e.tags) : (e.tags || e.tagsEn || []);
-    const tagsHtml = (tagField || []).map(tagId =>
-      `<a href="?tag=${encodeURIComponent(tagId)}" class="mini-tag" onclick="event.preventDefault();setActiveTag('${escapeAttr(tagId)}')">${escapeHtml(resolveTagDisplay(tagId))}</a>`
-    ).join('');
-
-    const langBadge = e.lang === 'en' ? ' EN' : (e.lang === 'zh' ? ' 中文' : '');
-    const dateStr = date + langBadge;
-
-    return `<article class="article-card">
-      <div class="meta">${dateStr}</div>
-      <h2><a href="${articleUrl}">${escapeHtml(title)}</a></h2>
-      ${abstract ? `<p class="abstract">${escapeHtml(abstract)}</p>` : ''}
-      ${tagsHtml ? `<div class="card-tags">${tagsHtml}</div>` : ''}
-    </article>`;
-  }).join('');
-}
-
-/* ── Tag Filter ────────────────────────────────────────────────── */
-function setActiveTag(tagId) {
-  activeTag = tagId;
-  // Update URL without reload
-  const url = new URL(window.location);
-  if (tagId) {
-    url.searchParams.set('tag', tagId);
-  } else {
-    url.searchParams.delete('tag');
-  }
-  window.history.replaceState({}, '', url.toString());
-  render();
-}
-
-/* ── Language ──────────────────────────────────────────────────── */
-function setLang(lang) {
-  pageLang = lang;
-  document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
-  render();
-}
-
-function updateI18n() {
-  const t = i18n[pageLang];
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    el.textContent = t[el.dataset.i18n] || el.textContent;
-  });
-  document.title = pageLang === 'en' ? 'Journal' : 'Journal · 日志';
-}
-
-/* ── Helpers ───────────────────────────────────────────────────── */
-function formatDate(dateStr, lang) {
-  if (!dateStr) return '';
-  const parts = dateStr.split('-');
-  if (parts.length >= 3) {
-    const y = parts[0], m = parts[1], d = parts[2].substring(0, 2);
-    return lang === 'en' ? `${months.en[parseInt(m)-1]} ${parseInt(d)}, ${y}`
-      : `${y}年${parseInt(m)}月${parseInt(d)}日`;
-  }
-  return dateStr;
-}
-const months = {
-  en: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-};
-
-function escapeHtml(s) {
-  const div = document.createElement('div');
-  div.textContent = s;
-  return div.innerHTML;
-}
-function escapeAttr(s) { return s.replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
-
-/* ── Start ─────────────────────────────────────────────────────── */
-init();
-</script>
 </body>
 </html>
