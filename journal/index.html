@@ -21,6 +21,18 @@
       padding-bottom: var(--space-9);
     }
 
+    /* Sticky Footer —— 内容少时把 footer 推到底部 */
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    main {
+      flex: 1;
+    }
+
+    /* Journal Specific Styles */
+
     .journal-header {
       margin-bottom: var(--space-7);
     }
