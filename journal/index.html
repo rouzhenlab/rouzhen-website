@@ -1,387 +1,542 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Journal · 日志 — ROUZHEN</title>
-  <meta name="description" content="ROUZHEN Journal — 写作、思考、创作。">
-  <link rel="icon" type="image/svg+xml" href="/assets/svg/favicon.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="ROUZHEN Journal — 生态札记，记录自然美学的探索与思考">
+  <meta name="keywords" content="ROUZHEN Journal, 自然美学, 苔藓, 生态札记">
+  <meta name="author" content="ROUZHEN">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ROUZHEN Journal — 生态札记">
+  <meta property="og:description" content="记录自然美学的探索与思考">
+  <meta property="og:url" content="https://rouzhen.pages.dev/journal/">
+  <meta property="og:image" content="https://pub-d925d0cb281a418d91ad6617fc10bc86.r2.dev/journal/moss-stone-fog-1.jpg.jpg">
   <link rel="canonical" href="https://rouzhen.pages.dev/journal/">
 
-  <!-- 引用主站样式，保持视觉一致 -->
+  <link rel="icon" type="image/svg+xml" href="/assets/svg/favicon.svg">
+
+  <title>Journal — ROUZHEN</title>
+
+  <!-- Styles -->
   <link rel="stylesheet" href="/styles/variables.css">
   <link rel="stylesheet" href="/styles/typography.css">
   <link rel="stylesheet" href="/styles/layout.css">
+  <link rel="stylesheet" href="/styles/animation.css">
   <link rel="stylesheet" href="/components/Navigation/Navigation.css">
+  <link rel="stylesheet" href="/components/Footer/Footer.css">
 
   <style>
-    /* Journal 页面专用微调 — 只加必要的，不重复定义 */
-    .journal-page {
-      padding-top: 120px;       /* 给固定导航栏留空间 */
-      padding-bottom: var(--space-9);
+    /* Journal Specific Styles */
+
+    /* Sticky Footer —— 内容少时把 footer 推到底部 */
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    main {
+      flex: 1;
     }
 
     .journal-header {
-      margin-bottom: var(--space-7);
+      padding: var(--space-10) var(--space-3) var(--space-6);
+      text-align: center;
+      min-height: 30vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      position: relative;
     }
 
     .journal-title {
-      font-size: 32px;
-      font-weight: 400;
-      letter-spacing: 0.15em;
-      margin-bottom: var(--space-2);
+      font-family: var(--font-heading);
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-4);
+      letter-spacing: 0.1em;
     }
 
     .journal-subtitle {
-      font-family: var(--font-sans);
-      font-size: 13px;
+      font-family: var(--font-body);
+      font-size: var(--space-4);
       color: var(--color-text-secondary);
-      letter-spacing: 0.15em;
-      margin-bottom: var(--space-6);
+      max-width: var(--container-narrow);
+      line-height: 1.8;
     }
 
-    /* 标签云 */
-    .tag-cloud {
+    /* ── Tag Filter Bar ── */
+    .tag-filter-bar {
       display: flex;
       flex-wrap: wrap;
-      gap: var(--space-3);
-      margin-bottom: var(--space-6);
-      padding-bottom: var(--space-5);
-      border-bottom: 1px solid var(--color-border);
+      justify-content: center;
+      gap: var(--space-2);
+      max-width: var(--container-narrow);
+      margin: 0 auto var(--space-6);
+      padding: 0 var(--space-3);
+    }
+
+    .tag-filter-bar:empty {
+      display: none;
     }
 
     .tag-pill {
-      font-family: var(--font-sans);
-      font-size: 13px;
-      letter-spacing: 0.08em;
-      padding: 6px 16px;
-      border: 1px solid var(--color-border);
-      border-radius: 100px;
-      background: none;
-      color: var(--color-text-secondary);
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      color: var(--color-moss);
+      background: transparent;
+      padding: var(--space-1) var(--space-3);
+      border: 1px solid var(--color-moss);
+      border-radius: var(--radius-sm);
       cursor: pointer;
-      transition: all var(--transition-fast);
-      text-decoration: none;
-      line-height: 1.4;
+      user-select: none;
+      transition: background var(--transition-fast), color var(--transition-fast);
     }
 
-    .tag-pill:hover,
+    .tag-pill:hover {
+      background: rgba(107, 124, 94, 0.06);
+    }
+
     .tag-pill.active {
-      color: var(--color-text-primary);
-      border-color: var(--color-moss-light);
-      background: var(--color-paper-warm);
+      background: var(--color-moss);
+      color: var(--color-text-light);
     }
 
-    .tag-pill .count {
-      color: var(--color-text-muted);
-      font-size: 11px;
-      margin-left: 4px;
+    .tag-count {
+      font-size: 0.75rem;
+      opacity: 0.7;
+      margin-left: 2px;
     }
 
-    /* 语言切换 */
-    .lang-toggle {
-      display: inline-flex;
-      gap: 8px;
-      margin-bottom: var(--space-6);
+    .tag-pill.active .tag-count {
+      opacity: 0.85;
     }
 
-    .lang-toggle button {
-      font-family: var(--font-sans);
-      font-size: 12px;
-      letter-spacing: 0.15em;
-      padding: 4px 0;
-      border: none;
-      background: none;
-      color: var(--color-text-muted);
-      cursor: pointer;
-      transition: color var(--transition-fast);
+    /* ── Journal Content ── */
+    .journal-content {
+      padding: 0 var(--space-3) var(--space-10);
+      max-width: var(--container-max);
+      margin: 0 auto;
     }
 
-    .lang-toggle button.active {
-      color: var(--color-text-primary);
+    .journal-entries {
+      display: grid;
+      gap: var(--space-6);
+      max-width: var(--container-narrow);
+      margin: 0 auto;
     }
 
-    .lang-toggle .lang-divider {
-      color: var(--color-border);
-      font-size: 12px;
-    }
-
-    /* 文章列表 */
-    .entry-list {
-      list-style: none;
-    }
-
-    .entry-item {
-      padding: var(--space-5) 0;
+    .journal-entry {
       border-bottom: 1px solid var(--color-border);
+      padding-bottom: var(--space-6);
+      transition: opacity var(--transition-base);
     }
 
-    .entry-item:last-child {
-      border-bottom: none;
+    .journal-entry:hover {
+      opacity: 0.8;
     }
 
-    .entry-date {
-      font-family: var(--font-sans);
-      font-size: 12px;
-      letter-spacing: 0.15em;
+    .journal-entry-date {
+      font-family: var(--font-body);
+      font-size: var(--space-3);
       color: var(--color-text-muted);
       margin-bottom: var(--space-2);
+      letter-spacing: 0.05em;
     }
 
-    .entry-title {
-      font-size: 18px;
-      font-weight: 500;
-      letter-spacing: 0.06em;
-      line-height: 1.5;
-      margin-bottom: var(--space-2);
-    }
-
-    .entry-title a {
+    .journal-entry-title {
+      font-family: var(--font-heading);
+      font-size: clamp(1.25rem, 3vw, 1.75rem);
       color: var(--color-text-primary);
+      margin-bottom: var(--space-3);
       text-decoration: none;
-      transition: color var(--transition-fast);
+      display: block;
     }
 
-    .entry-title a:hover {
+    .journal-entry-title:hover {
       color: var(--color-moss);
     }
 
-    .entry-excerpt {
-      font-size: 14px;
+    .journal-entry-excerpt {
+      font-family: var(--font-body);
+      font-size: var(--space-3);
       color: var(--color-text-secondary);
       line-height: 1.8;
-      letter-spacing: 0.02em;
-      margin-bottom: var(--space-2);
     }
 
-    .entry-tags {
+    .journal-entry-tags {
       display: flex;
-      flex-wrap: wrap;
       gap: var(--space-2);
+      margin-top: var(--space-3);
+      flex-wrap: wrap;
     }
 
-    .entry-tag {
-      font-family: var(--font-sans);
-      font-size: 11px;
-      letter-spacing: 0.08em;
-      color: var(--color-text-muted);
-      padding: 2px 10px;
-      border: 1px solid var(--color-border);
-      border-radius: 100px;
-      background: none;
-      cursor: pointer;
-      transition: all var(--transition-fast);
-    }
-
-    .entry-tag:hover {
+    .journal-tag {
+      font-family: var(--font-body);
+      font-size: 0.875rem;
       color: var(--color-moss);
-      border-color: var(--color-moss-light);
+      padding: var(--space-1) var(--space-2);
+      border: 1px solid var(--color-moss);
+      border-radius: var(--radius-sm);
+      background: transparent;
+      cursor: pointer;
+      transition: background var(--transition-fast), color var(--transition-fast);
     }
 
-    /* 空状态 */
-    .empty-state {
+    .journal-tag:hover {
+      background: rgba(107, 124, 94, 0.06);
+    }
+
+    .journal-empty {
       text-align: center;
-      padding: var(--space-7) 0;
-    }
-
-    .empty-state p {
-      font-family: var(--font-sans);
-      font-size: 14px;
+      padding: var(--space-10) var(--space-3);
       color: var(--color-text-muted);
-      letter-spacing: 0.08em;
     }
 
-    .loading-text {
-      font-family: var(--font-sans);
-      font-size: 13px;
-      color: var(--color-text-muted);
-      letter-spacing: 0.1em;
-      text-align: center;
-      padding: var(--space-7) 0;
+    .journal-empty-text {
+      font-family: var(--font-body);
+      font-size: var(--space-4);
+      line-height: 1.8;
     }
 
+    /* Responsive */
     @media (max-width: 768px) {
-      .journal-page {
-        padding-top: 100px;
-        padding-left: var(--space-4);
-        padding-right: var(--space-4);
+      .journal-header {
+        padding: var(--space-8) var(--space-3) var(--space-5);
+        min-height: 25vh;
       }
-      .journal-title {
-        font-size: 24px;
+
+      .journal-content {
+        padding: 0 var(--space-3) var(--space-8);
+      }
+
+      .tag-filter-bar {
+        margin-bottom: var(--space-5);
+      }
+    }
+
+    /* ── Bottom navigation — same pattern as article pages ── */
+    .journal-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-3);
+      max-width: var(--container-narrow);
+      margin: var(--space-6) auto;
+      padding: var(--space-5) var(--space-3);
+      border-top: 1px solid var(--color-border);
+    }
+
+    .journal-nav-back {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-family: var(--font-body);
+      font-size: 0.875rem;
+      color: var(--color-text-secondary);
+      text-decoration: none;
+      padding: var(--space-2) var(--space-3);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: transparent;
+    }
+
+    .journal-nav-back:hover {
+      color: var(--color-moss);
+      border-color: var(--color-moss);
+    }
+
+    @media (max-width: 640px) {
+      .journal-nav {
+        padding: var(--space-4) var(--space-3);
       }
     }
   </style>
 </head>
-<body class="journal-page">
+<body>
 
-  <!-- 最小化导航：复刻主站导航骨架 -->
-  <header class="header scrolled" style="position:fixed;background:rgba(255,255,255,0.92);backdrop-filter:blur(10px);pointer-events:auto;">
+  <header class="header" id="header">
     <nav class="navbar">
-      <div class="nav-logo" style="opacity:1;pointer-events:auto;">
-        <a href="/" style="text-decoration:none;">
-          <span class="nav-wave" style="color:var(--color-text-primary);">~</span>
+      <div class="nav-logo">
+        <a href="/" aria-label="ROUZHEN 首页">
+          <span class="nav-wave">~</span>
         </a>
       </div>
-      <ul class="nav-menu" style="opacity:1;pointer-events:auto;">
-        <li><a href="/#home" class="nav-link" style="color:var(--color-text-secondary);" data-en="Home" data-cn="首页">Home</a></li>
-        <li><a href="/#philosophy" class="nav-link" style="color:var(--color-text-secondary);" data-en="Philosophy" data-cn="理念">Philosophy</a></li>
-        <li><a href="/#story" class="nav-link" style="color:var(--color-text-secondary);" data-en="Story" data-cn="故事">Story</a></li>
-        <li><a href="/#collections" class="nav-link" style="color:var(--color-text-secondary);" data-en="Collections" data-cn="系列">Collections</a></li>
-        <li><a href="/#lab" class="nav-link" style="color:var(--color-text-secondary);" data-en="Lab" data-cn="实验">Lab</a></li>
-        <li><a href="/journal/" class="nav-link" style="color:var(--color-text-primary);" data-en="Journal" data-cn="札记">Journal</a></li>
-        <li><a href="/#contact" class="nav-link" style="color:var(--color-text-secondary);" data-en="Contact" data-cn="联系">Contact</a></li>
+      <ul class="nav-menu" id="navMenu">
+        <li><a href="/" class="nav-link" data-en="Home" data-cn="首页">Home</a></li>
+        <li><a href="/#philosophy" class="nav-link" data-en="Philosophy" data-cn="理念">Philosophy</a></li>
+        <li><a href="/#story" class="nav-link" data-en="Story" data-cn="故事">Story</a></li>
+        <li><a href="/#collections" class="nav-link" data-en="Collections" data-cn="系列">Collections</a></li>
+        <li><a href="/#lab" class="nav-link" data-en="Lab" data-cn="实验">Lab</a></li>
+        <li><a href="/journal/index.html" class="nav-link active" data-en="Journal" data-cn="札记">Journal</a></li>
+        <li><a href="/#contact" class="nav-link" data-en="Contact" data-cn="联系">Contact</a></li>
       </ul>
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
     </nav>
   </header>
 
-  <div class="container-narrow">
-    <div class="journal-header">
-      <h1 class="journal-title" data-en="Journal" data-cn="日志">Journal · 日志</h1>
-      <div class="lang-toggle">
-        <button class="active" data-lang="zh" id="btnZh">中文</button>
-        <span class="lang-divider">/</span>
-        <button data-lang="en" id="btnEn">EN</button>
+  <main>
+    <section class="journal-header">
+      <h1 class="journal-title" data-en="Journal" data-cn="札记">Journal</h1>
+      <p class="journal-subtitle" data-en="Ecological archives — records of natural aesthetics exploration" data-cn="生态札记 — 记录自然美学的探索与思考">Ecological archives �[...]
+    </section>
+
+    <div class="tag-filter-bar" id="tagFilterBar"></div>
+
+    <section class="journal-content">
+      <div class="journal-entries" id="journalEntries"></div>
+      <div class="journal-empty" id="journalEmpty" hidden>
+        <p class="journal-empty-text" data-en="No entries yet. Check back soon." data-cn="暂无文章，敬请期待。">暂无文章，敬请期待。</p>
       </div>
-      <p class="journal-subtitle" data-en="Writing, thinking, creating." data-cn="写作、思考、创作。">写作、思考、创作。</p>
-    </div>
+    </section>
 
-    <div class="tag-cloud" id="tagCloud">
-      <a class="tag-pill active" href="/journal/" data-tag="">全部</a>
+    <div class="journal-nav">
+      <a href="/journal/index.html" class="journal-nav-back" data-en="← Back to Journal" data-cn="← 返回札记">← 返回札记</a>
+      <div class="lang-switch">
+        <button class="lang-btn" data-lang="cn">中文</button>
+        <span class="lang-sep">/</span>
+        <button class="lang-btn" data-lang="en">EN</button>
+      </div>
     </div>
+  </main>
 
-    <div id="entryContainer">
-      <p class="loading-text">Loading…</p>
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-content">
+        <div class="footer-brand">
+          <div class="footer-logo">
+            <img src="/assets/svg/logo-white-en.svg" alt="ROUZHEN" class="footer-logo-en">
+            <img src="/assets/svg/logo-white-cn.svg" alt="柔眞" class="footer-logo-cn">
+          </div>
+          <p class="footer-tagline" data-en="Between Cloud & Moss" data-cn="云～苔　之　间">Between Cloud & Moss</p>
+        </div>
+        <nav class="footer-links">
+          <a href="/" class="footer-link" data-en="Home" data-cn="首页">Home</a>
+          <a href="/#philosophy" class="footer-link" data-en="Philosophy" data-cn="理念">Philosophy</a>
+          <a href="/#collections" class="footer-link" data-en="Collections" data-cn="系列">Collections</a>
+          <a href="/journal/index.html" class="footer-link" data-en="Journal" data-cn="札记">Journal</a>
+          <a href="/#contact" class="footer-link" data-en="Contact" data-cn="联系">Contact</a>
+        </nav>
+        <div class="footer-bottom">
+          <p class="footer-copyright">© 2026 ROUZHEN</p>
+        </div>
+      </div>
     </div>
-  </div>
+  </footer>
 
+  <!-- Scripts -->
+  <script src="/scripts/main.js"></script>
+  <script src="/scripts/tags.js"></script>
   <script>
-    (function() {
-      var lang = 'zh';
-      var activeTag = '';
-      var allEntries = [];
-      var allTags = [];
+    // Journal Entry Loader —— v0.10.0 (Tag-resolved)
+    // Phase 2: 标签渲染/筛选全部通过 TagResolver → tags.json 驱动
+    // ── URL: ?tag={id}  ── Display: tags.json[cn|en]
+    // ── 未知 Tag → console.warn + 显示原始值（graceful fallback）
 
-      // 从 URL 读取当前标签
-      var params = new URLSearchParams(window.location.search);
-      activeTag = params.get('tag') || '';
+    var ALL_ENTRIES = [];
+    var ACTIVE_ID = "";       // 当前筛选的 Tag ID（非原始字符串）
+    var ENTRY_TAG_IDS = {};  // { entryIndex: [id, ...] }  预计算的已解析标签 ID
+    var TAG_COUNTS = {};     // { id: count }  用于筛选栏排序
 
-      // 语言切换
-      document.getElementById('btnZh').addEventListener('click', function() { switchLang('zh'); });
-      document.getElementById('btnEn').addEventListener('click', function() { switchLang('en'); });
+    function escapeHtml(str) {
+      var div = document.createElement("div");
+      div.textContent = str || "";
+      return div.innerHTML;
+    }
 
-      function switchLang(l) {
-        lang = l;
-        document.getElementById('btnZh').className = l === 'zh' ? 'active' : '';
-        document.getElementById('btnEn').className = l === 'en' ? 'active' : '';
-        render();
-      }
+    function escapeAttr(str) {
+      return String(str).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    }
 
-      // 加载数据 — 从 R2 entries.json（Publish 写入，静态 JSON）
-      Promise.all([
-        fetch('/journal/data/entries.json').then(function(r) { return r.json(); }),
-        fetch('/journal/data/tags.json').then(function(r) { return r.json(); })
-      ]).then(function(results) {
-        var entriesData = results[0];
-        var tagsData = results[1];
+    function formatDateDisplay(dateStr) {
+      return (dateStr || "").replace(/-/g, ".");
+    }
 
-        allEntries = entriesData.entries || entriesData || [];
-        allTags = tagsData.tags || tagsData || [];
+    function currentLang() {
+      return document.body.classList.contains("lang-en") ? "en" : "cn";
+    }
 
-        renderTagCloud();
-        render();
-      }).catch(function(err) {
-        console.error('Failed to load journal data:', err);
-        document.getElementById('entryContainer').innerHTML =
-          '<div class="empty-state"><p>暂无法加载文章，请稍后再试。</p></div>';
+    /* ── 为每篇文章预计算 Tag ID ── */
+    function computeEntryTags() {
+      ENTRY_TAG_IDS = {};
+      TAG_COUNTS = {};
+      ALL_ENTRIES.forEach(function(entry, i) {
+        var ids = TagResolver.resolveMany(entry.tags || []);
+        ENTRY_TAG_IDS[i] = ids;
+        ids.forEach(function(id) {
+          TAG_COUNTS[id] = (TAG_COUNTS[id] || 0) + 1;
+        });
+      });
+    }
+
+    /* ── 筛选后的条目 ── */
+    function filteredEntries() {
+      if (!ACTIVE_ID) return ALL_ENTRIES;
+      return ALL_ENTRIES.filter(function(entry, i) {
+        return (ENTRY_TAG_IDS[i] || []).indexOf(ACTIVE_ID) !== -1;
+      });
+    }
+
+    /* ── 构建文章卡片 ── */
+    function buildEntryCard(entry, i) {
+      var article = document.createElement("article");
+      article.className = "journal-entry";
+      var lang = currentLang();
+
+      var ids = ENTRY_TAG_IDS[i] || [];
+      var tagsHtml = ids.map(function(id) {
+        var name = TagResolver.displayName(id, lang);
+        return '<span class="journal-tag" data-tag-id="' + escapeAttr(id) + '" data-en="' + escapeAttr(TagResolver.displayName(id, 'en')) + '" data-cn="' + escapeAttr(TagResolver.displayName(id, 'cn')) + '">' + escapeHtml(name) + '</span>';
+      }).join("\n            ");
+
+      article.innerHTML =
+        '<div class="journal-entry-date">' + formatDateDisplay(entry.date) + '</div>\n' +
+        '        <a href="/journal/' + escapeAttr(entry.file) + '" class="journal-entry-title"\n' +
+        '           data-cn-href="/journal/' + escapeAttr(entry.file) + '"\n' +
+        '           data-en-href="/journal/' + escapeAttr(entry.fileEn || entry.file) + '"\n' +
+        '           data-en="' + escapeAttr(entry.titleEn) + '" data-cn="' + escapeAttr(entry.title) + '">' + escapeHtml(entry.title) + '</a>\n' +
+        '        <p class="journal-entry-excerpt" data-en="' + escapeAttr(entry.excerptEn || entry.excerpt || '') + '" data-cn="' + escapeAttr(entry.excerpt || '') + '">' + escapeHtml(entry.excerpt || '') + '</p>\n' +
+        '        <div class="journal-entry-tags">\n            ' + tagsHtml + '\n        </div>';
+
+      article.querySelectorAll(".journal-tag").forEach(function(el) {
+        el.addEventListener("click", function(e) {
+          e.preventDefault();
+          setFilter(this.getAttribute("data-tag-id"));
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
       });
 
-      function getTagName(tagId) {
-        for (var i = 0; i < allTags.length; i++) {
-          if (allTags[i].id === tagId) {
-            return lang === 'zh' ? (allTags[i].cn || tagId) : (allTags[i].en || tagId);
-          }
-        }
-        return tagId;
-      }
+      return article;
+    }
 
-      function renderTagCloud() {
-        var html = '<a class="tag-pill' + (activeTag ? '' : ' active') + '" href="/journal/"><span data-en="All" data-cn="全部">全部</span></a>';
-        var tagCounts = {};
-        for (var i = 0; i < allEntries.length; i++) {
-          var entry = allEntries[i];
-          if (entry.published === false) continue;
-          var tags = entry.tags || entry.tags_cn || [];
-          for (var j = 0; j < tags.length; j++) {
-            var t = tags[j];
-            tagCounts[t] = (tagCounts[t] || 0) + 1;
-          }
-        }
-        for (var i = 0; i < allTags.length; i++) {
-          var tag = allTags[i];
-          var count = tagCounts[tag.id] || 0;
-          if (count === 0) continue;
-          var name = lang === 'zh' ? tag.cn : tag.en;
-          var isActive = activeTag === tag.id;
-          html += '<a class="tag-pill' + (isActive ? ' active' : '') + '" href="/journal/?tag=' + encodeURIComponent(tag.id) + '">' +
-            escapeHTML(name) + ' <span class="count">' + count + '</span></a>';
-        }
-        document.getElementById('tagCloud').innerHTML = html;
-      }
+    /* ── 筛选栏（Tag ID → tags.json Display Name）── */
+    function renderTagBar() {
+      var bar = document.getElementById("tagFilterBar");
+      var ids = Object.keys(TAG_COUNTS).sort(function(a, b) {
+        return TAG_COUNTS[b] - TAG_COUNTS[a];
+      });
+      var lang = currentLang();
 
-      function render() {
-        var filtered = allEntries.filter(function(e) {
-          if (e.published === false) return false;
-          if (!activeTag) return true;
-          var tags = e.tags || e.tags_cn || [];
-          return tags.indexOf(activeTag) !== -1;
+      if (ids.length === 0) { bar.innerHTML = ""; return; }
+
+      var html = '<span class="tag-pill' + (ACTIVE_ID ? "" : " active") + '" data-tag-id="">' +
+        '<span data-en="All" data-cn="全部">全部</span>' +
+        '<span class="tag-count">' + ALL_ENTRIES.length + '</span></span>';
+
+      ids.forEach(function(id) {
+        var name = TagResolver.displayName(id, lang);
+        var cls = "tag-pill" + (ACTIVE_ID === id ? " active" : "");
+        html += '<span class="' + cls + '" data-tag-id="' + escapeAttr(id) + '">' +
+          '<span data-en="' + escapeAttr(TagResolver.displayName(id, 'en')) + '"' +
+          ' data-cn="' + escapeAttr(TagResolver.displayName(id, 'cn')) + '"' +
+          '>' + escapeHtml(name) + '</span>' +
+          '<span class="tag-count">' + TAG_COUNTS[id] + '</span></span>';
+      });
+
+      bar.innerHTML = html;
+
+      bar.querySelectorAll(".tag-pill").forEach(function(el) {
+        el.addEventListener("click", function() {
+          setFilter(this.getAttribute("data-tag-id"));
         });
+      });
 
-        if (filtered.length === 0) {
-          document.getElementById('entryContainer').innerHTML =
-            '<div class="empty-state"><p data-en="No articles found." data-cn="暂无文章。">暂无文章。</p></div>';
-          return;
-        }
+      applyCurrentLanguageTo(bar);
+    }
 
-        var html = '<ul class="entry-list">';
-        for (var i = 0; i < filtered.length; i++) {
-          var e = filtered[i];
-          var title = lang === 'en' ? (e.titleEn || e.title) : (e.title || e.titleEn);
-          var excerpt = lang === 'en' ? (e.excerptEn || e.excerpt || '') : (e.excerpt || e.excerptEn || '');
-          var url = e.slug ? '/journal/entries/' + e.slug + (lang === 'en' ? '-en' : '') + '.html' : '#';
-          var dateStr = formatDate(e.date);
+    /* ── 渲染文章列表 ── */
+    function renderEntries() {
+      var container = document.getElementById("journalEntries");
+      var emptyState = document.getElementById("journalEmpty");
+      var entries = filteredEntries();
 
-          var tagsHtml = '';
-          var tags = e.tags || e.tags_cn || [];
-          for (var j = 0; j < tags.length; j++) {
-            var tagName = getTagName(tags[j]);
-            tagsHtml += '<a class="entry-tag" href="/journal/?tag=' + encodeURIComponent(tags[j]) + '">' +
-              escapeHTML(tagName) + '</a>';
-          }
+      container.innerHTML = "";
 
-          html += '<li class="entry-item">' +
-            '<div class="entry-date">' + escapeHTML(dateStr) + '</div>' +
-            '<h3 class="entry-title"><a href="' + url + '">' + escapeHTML(title) + '</a></h3>' +
-            (excerpt ? '<p class="entry-excerpt">' + escapeHTML(excerpt) + '</p>' : '') +
-            '<div class="entry-tags">' + tagsHtml + '</div>' +
-            '</li>';
-        }
-        html += '</ul>';
-
-        document.getElementById('entryContainer').innerHTML = html;
+      if (entries.length === 0) {
+        emptyState.hidden = false;
+        return;
       }
 
-      function formatDate(d) {
-        if (!d) return '';
-        var dt = new Date(d + 'T00:00:00Z');
-        return dt.getFullYear() + '年' + (dt.getMonth() + 1) + '月' + dt.getDate() + '日';
-      }
+      emptyState.hidden = true;
+      entries.forEach(function(entry, i) {
+        var globalIndex = ALL_ENTRIES.indexOf(entry);
+        container.appendChild(buildEntryCard(entry, globalIndex));
+      });
+      applyCurrentLanguageTo(container);
+    }
 
-      function escapeHTML(str) {
-        var div = document.createElement('div');
-        div.appendChild(document.createTextNode(str));
-        return div.innerHTML;
-      }
-    })();
+    /* ── 设置标签筛选（ID 驱动）── */
+    function setFilter(id) {
+      ACTIVE_ID = id;
+      updateUrl(id);
+      renderTagBar();
+      renderEntries();
+    }
+
+    /* ── URL 参数（使用 ID，非原始字符串）── */
+    function updateUrl(id) {
+      var url = window.location.pathname.replace(/\/$/, "");
+      if (id) url += "?tag=" + encodeURIComponent(id);
+      window.history.replaceState(null, "", url);
+    }
+
+    function readUrlTag() {
+      var params = new URLSearchParams(window.location.search);
+      return params.get("tag") || "";
+    }
+
+    /* ── 语言适配（通用）── */
+    function applyCurrentLanguageTo(container) {
+      var lang = currentLang();
+      container.querySelectorAll("[data-en][data-cn]").forEach(function(el) {
+        el.textContent = el.getAttribute("data-" + lang);
+      });
+      container.querySelectorAll("[data-en-href][data-cn-href]").forEach(function(el) {
+        el.setAttribute("href", el.getAttribute("data-" + lang + "-href"));
+      });
+    }
+
+    /* ── 入口 ── */
+    document.addEventListener("DOMContentLoaded", function() {
+      var emptyState = document.getElementById("journalEmpty");
+
+      TagResolver.onReady(function() {
+
+        fetch("/journal/data/entries.json")
+          .then(function(res) {
+            if (!res.ok) throw new Error("entries.json " + res.status);
+            return res.json();
+          })
+          .then(function(data) {
+            ALL_ENTRIES = (data.entries || [])
+              .filter(function(e) { return e.published !== false; })
+              .sort(function(a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+
+            if (ALL_ENTRIES.length === 0) {
+              emptyState.hidden = false;
+              return;
+            }
+
+            computeEntryTags();
+            ACTIVE_ID = readUrlTag();
+            renderTagBar();
+            renderEntries();
+          })
+          .catch(function() {
+            emptyState.hidden = false;
+          });
+
+      });
+      // 启动加载 tags.json
+      TagResolver.load();
+    });
   </script>
+
 </body>
 </html>
