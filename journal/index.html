@@ -390,7 +390,7 @@
         '           data-cn-href="/journal/' + escapeAttr(entry.file) + '"\n' +
         '           data-en-href="/journal/' + escapeAttr(entry.fileEn || entry.file) + '"\n' +
         '           data-en="' + escapeAttr(entry.titleEn) + '" data-cn="' + escapeAttr(entry.title) + '">' + escapeHtml(entry.title) + '</a>\n' +
-        '        <p class="journal-entry-excerpt" data-en="' + escapeAttr(entry.excerptEn || entry.excerpt || '') + '" data-cn="' + escapeAttr(entry.excerpt || '') + '">' + escapeHtml(entry.excer[...]) +
+        '        <p class="journal-entry-excerpt" data-en="' + escapeAttr(entry.excerptEn || entry.excerpt || '') + '" data-cn="' + escapeAttr(entry.excerpt || '') + '">' + escapeHtml(entry.excerpt || '') + '</p>\n' +
         '        <div class="journal-entry-tags">\n            ' + tagsHtml + '\n        </div>';
 
       article.querySelectorAll(".journal-tag").forEach(function(el) {
