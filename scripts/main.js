@@ -44,6 +44,7 @@ const LanguageManager = {
   /* ── 内部 ── */
   _apply() {
     const L = this._lang;
+    document.documentElement.lang = L;
     document.querySelectorAll('[data-en][data-cn]').forEach(el => {
       el.textContent = el.getAttribute('data-' + L);
     });

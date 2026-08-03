@@ -393,7 +393,138 @@
         '        <p class="journal-entry-excerpt" data-en="' + escapeAttr(entry.excerptEn || entry.excerpt || '') + '" data-cn="' + escapeAttr(entry.excerpt || '') + '">' + escapeHtml(entry.excer[...]) +
         '        <div class="journal-entry-tags">\n            ' + tagsHtml + '\n        </div>';
 
-    // (The content here is the same as the main branch after first revert.)
+      article.querySelectorAll(".journal-tag").forEach(function(el) {
+        el.addEventListener("click", function(e) {
+          e.preventDefault();
+          setFilter(this.getAttribute("data-tag-id"));
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        });
+      });
+
+      return article;
+    }
+
+    /* ── 筛选栏（Tag ID → tags.json Display Name）── */
+    function renderTagBar() {
+      var bar = document.getElementById("tagFilterBar");
+      var ids = Object.keys(TAG_COUNTS).sort(function(a, b) {
+        return TAG_COUNTS[b] - TAG_COUNTS[a];
+      });
+      var lang = currentLang();
+
+      if (ids.length === 0) { bar.innerHTML = ""; return; }
+
+      var html = '<span class="tag-pill' + (ACTIVE_ID ? "" : " active") + '" data-tag-id="">' +
+        '<span data-en="All" data-cn="全部">全部</span>' +
+        '<span class="tag-count">' + ALL_ENTRIES.length + '</span></span>';
+
+      ids.forEach(function(id) {
+        var name = TagResolver.displayName(id, lang);
+        var cls = "tag-pill" + (ACTIVE_ID === id ? " active" : "");
+        html += '<span class="' + cls + '" data-tag-id="' + escapeAttr(id) + '">' +
+          '<span data-en="' + escapeAttr(TagResolver.displayName(id, 'en')) + '"' +
+          ' data-cn="' + escapeAttr(TagResolver.displayName(id, 'cn')) + '"' +
+          '>' + escapeHtml(name) + '</span>' +
+          '<span class="tag-count">' + TAG_COUNTS[id] + '</span></span>';
+      });
+
+      bar.innerHTML = html;
+
+      bar.querySelectorAll(".tag-pill").forEach(function(el) {
+        el.addEventListener("click", function() {
+          setFilter(this.getAttribute("data-tag-id"));
+        });
+      });
+
+      applyCurrentLanguageTo(bar);
+    }
+
+    /* ── 渲染文章列表 ── */
+    function renderEntries() {
+      var container = document.getElementById("journalEntries");
+      var emptyState = document.getElementById("journalEmpty");
+      var entries = filteredEntries();
+
+      container.innerHTML = "";
+
+      if (entries.length === 0) {
+        emptyState.hidden = false;
+        return;
+      }
+
+      emptyState.hidden = true;
+      entries.forEach(function(entry, i) {
+        var globalIndex = ALL_ENTRIES.indexOf(entry);
+        container.appendChild(buildEntryCard(entry, globalIndex));
+      });
+      applyCurrentLanguageTo(container);
+    }
+
+    /* ── 设置标签筛选（ID 驱动）── */
+    function setFilter(id) {
+      ACTIVE_ID = id;
+      updateUrl(id);
+      renderTagBar();
+      renderEntries();
+    }
+
+    /* ── URL 参数（使用 ID，非原始字符串）── */
+    function updateUrl(id) {
+      var url = window.location.pathname.replace(/\/$/, "");
+      if (id) url += "?tag=" + encodeURIComponent(id);
+      window.history.replaceState(null, "", url);
+    }
+
+    function readUrlTag() {
+      var params = new URLSearchParams(window.location.search);
+      return params.get("tag") || "";
+    }
+
+    /* ── 语言适配（通用）── */
+    function applyCurrentLanguageTo(container) {
+      var lang = currentLang();
+      container.querySelectorAll("[data-en][data-cn]").forEach(function(el) {
+        el.textContent = el.getAttribute("data-" + lang);
+      });
+      container.querySelectorAll("[data-en-href][data-cn-href]").forEach(function(el) {
+        el.setAttribute("href", el.getAttribute("data-" + lang + "-href"));
+      });
+    }
+
+    /* ── 入口 ── */
+    document.addEventListener("DOMContentLoaded", function() {
+      var emptyState = document.getElementById("journalEmpty");
+
+      TagResolver.onReady(function() {
+
+        fetch("/journal/data/entries.json")
+          .then(function(res) {
+            if (!res.ok) throw new Error("entries.json " + res.status);
+            return res.json();
+          })
+          .then(function(data) {
+            ALL_ENTRIES = (data.entries || [])
+              .filter(function(e) { return e.published !== false; })
+              .sort(function(a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : 0; });
+
+            if (ALL_ENTRIES.length === 0) {
+              emptyState.hidden = false;
+              return;
+            }
+
+            computeEntryTags();
+            ACTIVE_ID = readUrlTag();
+            renderTagBar();
+            renderEntries();
+          })
+          .catch(function() {
+            emptyState.hidden = false;
+          });
+
+      });
+      // 启动加载 tags.json
+      TagResolver.load();
+    });
   </script>
 
 </body>
