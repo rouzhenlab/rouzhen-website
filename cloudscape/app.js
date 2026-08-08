@@ -41,6 +41,7 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (bgImg.complete && bgImg.naturalWidth > 0) resetImageFit();
     rebuildWakeGrid();
+    rebuildResidual();
   }
   window.addEventListener('resize', resizeCanvas);
   window.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -178,10 +179,83 @@
     tx.putImageData(imgData, 0, 0);
     return tc;
   }
+  // === V0.3 侵蚀纹理序列（多尺度分层） ===
+  // 不再让粒子"放大+变透明"消失(泡泡破裂感)
+  // 改为:云体被流场拉薄 → 侵蚀 → 破碎 → 扩散 → 转化为残留场
+  //
+  // 侵蚀有方向性和尺度层次(非随机碎片):
+  //   lv1: 大尺度低频噪声 → 大块先变薄(云体被风拉开的大结构)
+  //   lv2: 大块扩展 + 中等结构开始断裂
+  //   lv3: 中等尺度主导 → 结构被拉开成条带
+  //   lv4: 小尺度高频 → 只剩细丝/碎屑最后消散
+  // 噪声沿 x 拉伸(运动方向),drawLayer 中 stretchAngle 旋转后跟随实际运动方向
+  const ERODE_LEVELS = 5;
+  function buildErodedSequence(style, seed) {
+    const base = buildCloudTexture(style, seed);
+    const W = base.width, H = base.height;
+    const seq = [base]; // level 0 = 完整
+    const bigNoise = makeNoise2D(seed + 9999);   // 大尺度(低频)
+    const medNoise = makeNoise2D(seed + 8888);   // 中尺度
+    const smlNoise = makeNoise2D(seed + 7777);   // 小尺度(高频)
+    const baseCtx = base.getContext('2d');
+    const imgBase = baseCtx.getImageData(0, 0, W, H);
+    const db = imgBase.data;
+
+    for (let lv = 1; lv < ERODE_LEVELS; lv++) {
+      const tc = document.createElement('canvas');
+      tc.width = W; tc.height = H;
+      const tx = tc.getContext('2d');
+      const img = tx.createImageData(W, H);
+      const d = img.data;
+
+      // 各等级的侵蚀强度(递增)和主导尺度
+      // lv1: 大块变薄(阈值低,只咬大块) → lv4: 细丝残存(阈值高,只剩高频细节)
+      const strength = lv / ERODE_LEVELS; // 0.2, 0.4, 0.6, 0.8
+      const bigW = lv <= 2 ? 1.0 : (lv === 3 ? 0.5 : 0.2);   // 大尺度权重递减
+      const medW = lv === 2 ? 0.3 : (lv === 3 ? 0.5 : 0.3);
+      const smlW = lv <= 2 ? 0.0 : (lv === 3 ? 0.2 : 0.5);   // 小尺度后期才出现
+
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const i = (y * W + x) * 4;
+          const baseA = db[i + 3];
+          if (baseA === 0) { d[i + 3] = 0; continue; }
+
+          // 三尺度噪声,均沿 x 拉伸(模拟运动方向被风拉散)
+          const bigN = (fbm(bigNoise, x / W * 2.5, y / H * 5.5, 2, 2, 0.5) + 1) * 0.5;
+          const medN = (fbm(medNoise, x / W * 6, y / H * 13, 3, 2, 0.5) + 1) * 0.5;
+          const smlN = (fbm(smlNoise, x / W * 14, y / H * 28, 2, 2, 0.5) + 1) * 0.5;
+          const wsum = bigW + medW + smlW;
+          const nv = (bigN * bigW + medN * medW + smlN * smlW) / wsum;
+
+          // 软阈值:不是硬切(避免碎片感),而是渐变侵蚀
+          // threshold 以下逐渐变薄,最低降到 0
+          const threshold = strength * 0.6;
+          const softRange = 0.22;
+          let erodeMask;
+          if (nv < threshold) {
+            erodeMask = 0;
+          } else if (nv < threshold + softRange) {
+            erodeMask = (nv - threshold) / softRange;
+            erodeMask = erodeMask * erodeMask * (3 - 2 * erodeMask); // smoothstep 软化
+          } else {
+            erodeMask = 1;
+          }
+          d[i] = db[i];
+          d[i + 1] = db[i + 1];
+          d[i + 2] = db[i + 2];
+          d[i + 3] = Math.floor(baseA * erodeMask);
+        }
+      }
+      tx.putImageData(img, 0, 0);
+      seq.push(tc);
+    }
+    return seq;
+  }
   const TEXTURE_POOL = {
-    puff: [buildCloudTexture('puff', 101), buildCloudTexture('puff', 202), buildCloudTexture('puff', 303)],
-    wisp: [buildCloudTexture('wisp', 404), buildCloudTexture('wisp', 505), buildCloudTexture('wisp', 606)],
-    layer: [buildCloudTexture('layer', 707), buildCloudTexture('layer', 808), buildCloudTexture('layer', 909)],
+    puff: [buildErodedSequence('puff', 101), buildErodedSequence('puff', 202), buildErodedSequence('puff', 303)],
+    wisp: [buildErodedSequence('wisp', 404), buildErodedSequence('wisp', 505), buildErodedSequence('wisp', 606)],
+    layer: [buildErodedSequence('layer', 707), buildErodedSequence('layer', 808), buildErodedSequence('layer', 909)],
   };
   function randTexture(style) { return TEXTURE_POOL[style][(Math.random() * TEXTURE_POOL[style].length) | 0]; }
 
@@ -240,6 +314,64 @@
       wakeVY[i] *= decay;
       wakeAge[i] += dtFrames;
     }
+  }
+
+  // ================== V0.3 Residual Density Field（残留湿度场） ==================
+  // 不是"死粒子尸体",是云场消散后留在空气中的极淡湿度
+  // 新云经过时会叠加,产生时间层次感:第一团云走过留淡痕 → 第二团经过叠加
+  // 属于空间,不属于粒子:无颗粒边缘,无独立运动,缓慢衰减
+  //
+  // 三大约束:
+  //   1) 不太明显:RESIDUAL_MAX_ALPHA 钳制,目标 5-10%
+  //   2) 不跟云跑:deposit 到固定网格位置,粒子移动后 deposit 到新位置,旧位置残留不动
+  //   3) 递减叠加:用 source-over(非 lighter),天然渐近饱和,避免越积越脏
+  let residualCanvas = null, residualCtx = null, resW = 0, resH = 0;
+  const RES_SCALE = 4; // 1/4 分辨率,模糊感正好符合湿度质感
+  const RESIDUAL_MAX_ALPHA = 0.08; // 可调:残留场上限,先控制在 8%
+
+  function rebuildResidual() {
+    resW = Math.max(2, Math.ceil(viewW / RES_SCALE));
+    resH = Math.max(2, Math.ceil(viewH / RES_SCALE));
+    residualCanvas = document.createElement('canvas');
+    residualCanvas.width = resW;
+    residualCanvas.height = resH;
+    residualCtx = residualCanvas.getContext('2d');
+  }
+  // 每帧极缓慢衰减(湿度慢慢消散,约 5-6 秒衰减一半)
+  function decayResidual(dtFrames) {
+    if (!residualCtx) return;
+    residualCtx.globalCompositeOperation = 'destination-out';
+    residualCtx.fillStyle = `rgba(0,0,0,${0.0035 * dtFrames})`;
+    residualCtx.fillRect(0, 0, resW, resH);
+    residualCtx.globalCompositeOperation = 'source-over';
+    residualCtx.globalAlpha = 1;
+  }
+  // 真正的 clamp:逐像素限制 alpha 到 RESIDUAL_MAX_ALPHA
+  // 纠正之前错误:source-over 多次写入会渐近到 1.0,不是 8%
+  // 必须主动 clamp,RESIDUAL_MAX_ALPHA 才是真正的硬上限
+  // 1/4 分辨率下 ~13万像素,每帧一次性能可接受
+  function clampResidual() {
+    if (!residualCtx) return;
+    const img = residualCtx.getImageData(0, 0, resW, resH);
+    const d = img.data;
+    const maxA = Math.floor(RESIDUAL_MAX_ALPHA * 255);
+    for (let i = 3; i < d.length; i += 4) {
+      if (d[i] > maxA) d[i] = maxA;
+    }
+    residualCtx.putImageData(img, 0, 0);
+  }
+  // 粒子末期写入残留:source-over 累积,但由 clampResidual 保证不超上限
+  function depositResidual(p) {
+    if (!residualCtx) return;
+    const rx = p.x / RES_SCALE;
+    const ry = p.y / RES_SCALE;
+    const baseTex = p.texSeq[0];
+    const rs = (baseTex.width * p.curScale) / RES_SCALE * 0.75;
+    // source-over 写入,clampResidual 会保证 alpha 不超 RESIDUAL_MAX_ALPHA
+    residualCtx.globalCompositeOperation = 'source-over';
+    residualCtx.globalAlpha = RESIDUAL_MAX_ALPHA;
+    residualCtx.drawImage(baseTex, rx - rs / 2, ry - rs / 2, rs, rs * p.squishY);
+    residualCtx.globalAlpha = 1;
   }
 
   // ================== 模式切换 ==================
@@ -302,7 +434,7 @@
     style = opts.style || style;
     depth = opts.depth || depth;
 
-    const tex = randTexture(style);
+    const texSeq = randTexture(style); // V0.3: 返回侵蚀纹理序列(5级)
 
     const baseScale = style === 'puff'
       ? (0.15 + Math.random() * 0.18)
@@ -318,8 +450,8 @@
     // wisp 更扁（0.60 → 0.48），强化牵丝形态
     const squishY = style === 'wisp' ? 0.48 : style === 'layer' ? 0.82 : 0.95;
 
-    // 消失加快 1/3：32-56s → 22-37s（均值 ~30s）
-    const lifespan = 22 + Math.random() * 15;
+    // V0.3: 生命周期缩短为 8-14s(不再是泡泡模型,侵蚀消散更快)
+    const lifespan = 8 + Math.random() * 6;
 
     // 初始速度：继承指针速度（跟随手指），去掉随机发散（减少羽绒飞溅感）
     const initVX = (opts.vx || 0) + (Math.random() - 0.5) * 0.08;
@@ -329,7 +461,7 @@
     const alphaMul = 0.55 + Math.random() * 0.7;
 
     particles.push({
-      tex, style, depth,
+      texSeq, style, depth,
       x: sx, y: sy,
       vx: initVX, vy: initVY,
       // 翻滚参数
@@ -501,6 +633,7 @@
     windTime += dt * 1.0;
     curlTime += dt * 0.5;
     stepWake(dtFrames);
+    decayResidual(dtFrames); // V0.3: 残留湿度场缓慢衰减
 
     if (!isPointerDown) { pointerVX *= 0.9; pointerVY *= 0.9; }
 
@@ -598,9 +731,10 @@
         const t = (u - 0.08) / (0.55 - 0.08);
         p.curScale = p.initScale * (1.0 + t * 0.15);
       } else {
-        // dissipating：1.15 → 1.7（连续扩散，从 active 末端 1.15 接续）
+        // V0.3: dissipating 不再膨胀(1.15→1.25),扩散交给速度场+侵蚀纹理
+        // 避免泡泡破裂感:云不"变大消失",而是"被侵蚀散开"
         const t = (u - 0.55) / 0.45;
-        p.curScale = p.initScale * (1.15 + t * 0.55);
+        p.curScale = p.initScale * (1.15 + t * 0.10);
       }
 
       // === alpha：全程 smoothstep 曲线，无恒定段，无拐点（根治气泡破裂感） ===
@@ -633,19 +767,27 @@
       // 避免 born 早期 alpha 接近 0 时被误删
       if (p._born && u >= 0.08) p._born = false;
 
+      // V0.3: dissipating 后期(alpha < 0.08)持续写入残留湿度场
+      // 云被侵蚀散开后,密度写入空间湿度,粒子本身继续消散至删除
+      if (p.phase === 'dissipating' && !p._born && p.alpha < 0.08 && p.alpha > 0.0001) {
+        depositResidual(p);
+      }
+
       // 屏幕外软切（超出边界才清理，且只在 alpha 已经很低时清理，避免可见时被剪）
       const offEdge = (p.x < -250 || p.x > viewW + 250 || p.y < -250 || p.y > viewH + 250);
       if (offEdge && p.alpha < 0.02) {
         particles.splice(i, 1);
         continue;
       }
-      // 寿命结束彻底清理（u>=1 时 smoothstep 已自然归零，无视觉跳变）
-      // 关键修复：清理阈值必须 < 渲染阈值(0.0003)，否则粒子在仍可见时被移除→气泡破裂
-      // 现在阈值 0.00005 远低于渲染阈值，粒子先淡出不可见，再被清理
+      // 寿命结束彻底清理（u>=1 时侵蚀纹理已到最碎,smoothstep 已自然归零,无视觉跳变）
       if (u >= 1.0 || (!p._born && p.alpha < 0.00005)) {
         particles.splice(i, 1);
       }
     }
+
+    // V0.3: deposit 全部完成后,clamp 残留场到 RESIDUAL_MAX_ALPHA(真正的硬上限)
+    // 纠正 source-over 错误:不 clamp 会渐近到 1.0
+    clampResidual();
 
     // ===== 渲染 =====
     ctx.globalCompositeOperation = 'source-over';
@@ -659,7 +801,17 @@
       ctx.drawImage(bgImg, viewW / 2 + bgX - cw / 2, viewH / 2 + bgY - ch / 2, cw, ch);
     }
 
-    // 先画 dissipating（消散层，最底层，最通透）
+    // V0.3: 先画残留湿度场(最底层,在新云之下,是上一团云留下的痕迹)
+    // 无颗粒边缘,是空气湿度而非尸体;新云经过时叠加产生时间层次
+    // canvas 内部已钳制到 RESIDUAL_MAX_ALPHA,渲染不再额外降
+    if (residualCanvas) {
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = 1;
+      ctx.drawImage(residualCanvas, 0, 0, viewW, viewH);
+      ctx.globalAlpha = 1;
+    }
+
+    // 先画 dissipating（消散层，被侵蚀的云）
     drawLayer('dissipating', particles);
     // 再画 active + born（主体层）
     drawLayer('active', particles);
@@ -679,15 +831,26 @@
       if (mode === 'active' && p.phase !== 'active' && p.phase !== 'born') continue;
 
       const a = p.alpha;
-      if (a < 0.0003) continue; // 阈值再降，根治可见粒子被跳过造成的气泡破裂感
+      if (a < 0.0003) continue;
 
-      const tw = p.tex.width * p.curScale;
-      const th = p.tex.height * p.curScale * p.squishY;
+      // V0.3: dissipating 阶段按 u 进度选择侵蚀纹理等级
+      // 云体被噪声侵蚀:完整 → 空洞 → 断裂 → 碎片,而非整体变淡(根治泡泡破裂感)
+      let tex;
+      if (p.phase === 'dissipating') {
+        const disU = Math.min(1, Math.max(0, (p.life / p.lifespan - 0.55) / 0.45));
+        const lv = Math.min(ERODE_LEVELS - 1, Math.floor(disU * ERODE_LEVELS));
+        tex = p.texSeq[lv];
+      } else {
+        tex = p.texSeq[0];
+      }
+
+      const tw = tex.width * p.curScale;
+      const th = tex.height * p.curScale * p.squishY;
 
       ctx.save();
       ctx.translate(p.x, p.y);
 
-      // 消散期拉伸：沿运动方向拉长
+      // 拉伸：沿运动方向拉长（牵丝 + 侵蚀方向一致）
       if (p.stretchAmount > 0.01) {
         ctx.rotate(p.stretchAngle);
         ctx.scale(1 + p.stretchAmount, 1 - p.stretchAmount * 0.3);
@@ -696,12 +859,12 @@
       }
 
       ctx.globalAlpha = a;
-      ctx.drawImage(p.tex, -tw / 2, -th / 2, tw, th);
+      ctx.drawImage(tex, -tw / 2, -th / 2, tw, th);
       ctx.restore();
     }
   }
 
-  window.__dbg = { particles, canvas, getPos, sampleCurl, sampleAmbientWind };
+  window.__dbg = { particles, canvas, getPos, sampleCurl, sampleAmbientWind, get residualCanvas(){return residualCanvas;} };
 
   // —— 启动 ——
   (function startLoop() {
