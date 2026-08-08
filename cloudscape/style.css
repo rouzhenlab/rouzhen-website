@@ -1,1 +1,80 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+body, html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #0b0d0c;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #f0f2ef;
+}
+
+#canvas-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.ui-overlay {
+  position: absolute;
+  bottom: 2.5rem;
+  left: 0;
+  width: 100%;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.2rem;
+  pointer-events: none;
+}
+
+.cloud-tools, .action-tools {
+  display: flex;
+  gap: 0.75rem;
+  pointer-events: auto;
+  background: rgba(11, 13, 12, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 0.5rem 0.8rem;
+  border-radius: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tool-btn {
+  background: transparent;
+  border: none;
+  color: #8b938f;
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  padding: 0.5rem 0.9rem;
+  border-radius: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tool-btn:hover {
+  color: #f0f2ef;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tool-btn.active {
+  color: #f0f2ef;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.upload-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
 
