@@ -66,7 +66,8 @@
   window._bgSet = ({url,scale,dx,dy})=>{ if(url)bgImg.src=url; if(scale!=null)bgScale=scale; if(dx!=null)bgX=dx; if(dy!=null)bgY=dy; };
   const WAKE_CELL = 36;
   const WAKE_STRENGTH_SCALE = 0.25;
-  const DIV_LOSS_SCALE = 4.5, SHEAR_LOSS_SCALE = 1.0, SHEAR_LOSS_CAP = 0.04, TOTAL_LOSS_CAP = 0.055;
+  const DIV_LOSS_SCALE = 1.5, SHEAR_LOSS_SCALE = 0.33, SHEAR_LOSS_CAP = 0.013, TOTAL_LOSS_CAP = 0.018;
+  let curlNoiseSeeds = []; for (let i=0;i<24;i++) curlNoiseSeeds.push(Math.random()*1000);
   let wakeCols=0, wakeRows=0, wakeVX=null, wakeVY=null, wakeAge=null;
   function rebuildWakeGrid() {
     wakeCols = Math.ceil(viewW/WAKE_CELL)+2; wakeRows = Math.ceil(viewH/WAKE_CELL)+2;
@@ -105,7 +106,8 @@
       const t1=rnd(),t2=rnd(),r=Math.sqrt(t1)*sp,th=t2*Math.PI*2,dx=Math.cos(th)*r,dy=Math.sin(th)*r;
       const density = gauss(r,sp*0.55), x=cx+dx, y=cy+dy;
       const bs=(0.05+rnd()*MAX_SCALE_SPAN)*sb, ba=(0.06+rnd()*0.10)*(0.3+density*0.7);
-      samplingPoints.push({x,y,vx:(rnd()-0.5)*0.02+(opt?.vx??0),vy:(rnd()-0.5)*0.02+(opt?.vy??0),rot:rnd()*Math.PI*2,rotSpeed:(rnd()-0.5)*0.004,scale:bs,curScale:bs,baseAlpha:ba,alpha:ba,density,tex:INK_TEXTURES[(seed+i)%8],depth:rnd(),stretchAmount:0,stretchAngle:0,breathSeed:rnd()*Math.PI*2,breathFreq:0.3+rnd()*0.8,squishY:0.78+rnd()*0.42,birthFrame:globalFrameCounter});
+      const randAng=rnd()*Math.PI*2,randSpd=0.05+rnd()*0.08;
+      samplingPoints.push({x,y,vx:Math.cos(randAng)*randSpd+(opt?.vx??0),vy:Math.sin(randAng)*randSpd+(opt?.vy??0),selfDrift:randAng,selfDriftSpd:randSpd*0.6,rot:rnd()*Math.PI*2,rotSpeed:(rnd()-0.5)*0.004,scale:bs,curScale:bs,baseAlpha:ba,alpha:ba,density,tex:INK_TEXTURES[(seed+i)%8],depth:rnd(),stretchAmount:0,stretchAngle:0,breathSeed:rnd()*Math.PI*2,breathFreq:0.3+rnd()*0.8,squishY:0.78+rnd()*0.42,birthFrame:globalFrameCounter});
     }
     while(samplingPoints.length>MAX_COUNT_HARD){const i=((globalFrameCounter*13)>>>0)%samplingPoints.length;releaseSamplingPoint(i);}
   }
@@ -119,8 +121,17 @@
   function pu(){down=false;}
   canvas.addEventListener('mousedown',pd);window.addEventListener('mousemove',pm);window.addEventListener('mouseup',pu);
   canvas.addEventListener('touchstart',pd,{passive:false});canvas.addEventListener('touchmove',pm,{passive:false});canvas.addEventListener('touchend',pu);
-  function sCurl(x,y){const sc=0.0019;const a=Math.sin(x*sc)*Math.cos(y*sc*1.4)*6.28+Math.sin(x*sc*0.5+3.1)*Math.cos(y*sc*0.8+1.7)*2.4+Math.sin((x+y)*sc*0.3)*4.7;return{x:Math.cos(a)*0.28,y:Math.sin(a)*0.28}}
-  function sWind(x,y){if(expM!==0)return{x:0,y:0};const b=0.025;return{x:b*(0.9+Math.sin(x*0.0022)*0.2+Math.cos(y*0.0017+0.8)*0.25),y:b*(0.3*Math.cos(x*0.0013-1.1)+0.2*Math.sin(y*0.0021+0.5))}}
+  function sCurl(x,y){
+    if(expM!==0)return{x:0,y:0};
+    const s=curlNoiseSeeds,sc=0.0012,t=wT*0.3;
+    let a=0;
+    for(let i=0;i<8;i++){
+      const k1=0.4+i*0.22,k2=1.1+i*0.17;
+      a+=Math.sin(x*sc*k1+s[i*3])*Math.cos(y*sc*k2+s[i*3+1])*(1.2+i*0.08)+Math.sin((x+y)*sc*0.23+t+s[i*3+2])*0.9;
+    }
+    return{x:Math.cos(a)*0.1,y:Math.sin(a)*0.1};
+  }
+  function sWind(x,y){if(expM!==0)return{x:0,y:0};const b=0.006,s=curlNoiseSeeds,t=wT*0.12;return{x:b*(0.5+Math.sin(x*0.0008+s[22]+t*0.3)*0.25+Math.cos(y*0.0006+s[23])*0.25),y:b*(0.35*Math.cos(x*0.0007+s[21]-t*0.2)+0.25*Math.sin(y*0.0009+s[20]))}}
   function sV(x,y,sf,dp){const wk=fC.wakeActive?sampleWake(x,y):{x:0,y:0};const cl=sCurl(x,y);const wd=sWind(x,y);const cw=fC.curlAmp*(0.7+dp*0.3+sf*0.1);return{x:(wd.x+cl.x*cw)*fC.windAmp+wk.x*1.8,y:(wd.y+cl.y*cw)*fC.windAmp+wk.y*1.8}}
   function sVG(x,y,sf,dp){const E=4;const c=sV(x,y,sf,dp);const rx=sV(x+E,y,sf,dp),lx=sV(x-E,y,sf,dp),ry=sV(x,y+E,sf,dp),ly=sV(x,y-E,sf,dp);const dxdx=(rx.x-lx.x)/(2*E),dydy=(ry.y-ly.y)/(2*E),dxdy=(ry.x-ly.x)/(2*E),dydx=(rx.y-lx.y)/(2*E);return{vx:c.x,vy:c.y,divergence:dxdx+dydy,shear:Math.abs(dxdy)+Math.abs(dydx)+Math.abs(dxdx-dydy)*0.5}}
   const ACC_N=600,ACC_S=30,ACC_AB=0.999,ACC_G=1e-5,ACC_CR=0.9;
@@ -238,10 +249,13 @@
       const s=samplingPoints[i];
       const sf=Math.min(1,Math.max(0,(s.curScale-0.05)/0.22));
       const g=sVG(s.x,s.y,sf,s.depth);
-      const dp=Math.pow(0.92,dF);
-      s.vx=s.vx*dp+g.vx*dF;
-      s.vy=s.vy*dp+g.vy*dF;
-      const mv=0.3,vl=Math.hypot(s.vx,s.vy);
+      const dp=Math.pow(0.985,dF);
+      s.selfDrift+=(Math.random()-0.5)*0.12;
+      const sdx=Math.cos(s.selfDrift)*s.selfDriftSpd*0.35;
+      const sdy=Math.sin(s.selfDrift)*s.selfDriftSpd*0.35;
+      s.vx=s.vx*dp+(g.vx*0.35+sdx)*dF;
+      s.vy=s.vy*dp+(g.vy*0.35+sdy)*dF;
+      const mv=0.1,vl=Math.hypot(s.vx,s.vy);
       if(vl>mv){s.vx=s.vx/vl*mv;s.vy=s.vy/vl*mv;}
       s.x+=s.vx*dF;s.y+=s.vy*dF;
       s.rot+=s.rotSpeed*dF;
