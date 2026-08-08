@@ -2,20 +2,19 @@
   'use strict';
 
   // ==================================================================
-  // V0.4 Calm Cloud
+  // V0.2 Motion Rewrite
   //
-  // 调整目标：
-  //   1) 不要 30% 湿痕残留固化 → 完整消散
-  //   2) 消失时长延长一倍再减半 → 生命周期 32-56s，alpha smoothstep 柔和
-  //   3) 不要羽绒飞溅、不要突然抖动 → curl 降幅度 + 高阻尼 + 低速度上限
-  //   4) 手指点哪里就在哪里生成 → 小 spread，跟随手指速度
-  //   5) 按住移动 → 粒子跟随手指缓慢移动
-  //   6) 消除突然消失（抖动真因）：
-  //      - alpha 阈值 0.0035 → 0.0006（接近不可见才剪）
-  //      - MAX_PARTICLES 满了拒绝新增（不 shift）
-  //      - 屏幕外软切（只在 alpha 已经很低时清理）
-  //      - 渲染跳过阈值 0.003 → 0.0008
-  //      - alpha 曲线末端用 smoothstep
+  // 核心理念：让云失去锚点。
+  //   云来了 → 云经过 → 云翻滚 → 云散开 → 只留很淡的湿痕 → 下一团再经过
+  //
+  // 与 V0.1 的根本区别：
+  //   1) 删除 anchorX/Y + spring + maxDrift + densityLevel
+  //      粒子不再问"我该回到哪里"，只问"此刻我受到什么力"
+  //   2) 纯力积分：风 → curl涡旋 → 指针冲量 → 加速度 → 速度 → 位置
+  //   3) curl 噪声涡旋场：粒子同时前进+上升+横向拉伸+局部旋转+卷曲
+  //   4) 生命周期 8-14s：出生淡入 → 稳定翻滚 → 消散拉长 → 留 30% 湿痕底
+  //   5) 30% 不是死粒子残骸，是云场底密度（淡湿痕），新云从上面经过叠加
+  //   6) 指针 = 冲量扰动（不是原地加厚），划过带走已有粒子
   // ==================================================================
 
   const canvas = document.getElementById('mainCanvas');
@@ -46,7 +45,7 @@
   window.addEventListener('resize', resizeCanvas);
   window.addEventListener('contextmenu', (e) => e.preventDefault());
 
-  // ================== 伪随机 + 值噪声 + FBM ==================
+  // ================== 伪随机 + 值噪声 + FBM + 扭曲FBM ==================
   function mulberry32(seed) {
     return function () {
       let t = seed += 0x6D2B79F5;
@@ -89,6 +88,8 @@
   }
 
   // ================== Curl 涡旋场（翻滚核心） ==================
+  // 用两层 FBM 的梯度差分构造旋转向量场
+  // 粒子在 curl 场中会自然产生涡旋、卷曲、拉伸运动
   const curlNoiseA = makeNoise2D(1111);
   const curlNoiseB = makeNoise2D(2222);
   let curlTime = 0;
@@ -97,6 +98,7 @@
     const eps = 1.5;
     const s = 0.0018;
     const t = curlTime;
+    // 两个独立标量场的梯度，交叉构成旋转向量
     const n1_x = fbm(curlNoiseA, (x + eps) * s, y * s + t * 0.08, 3, 2, 0.5);
     const n1_xm = fbm(curlNoiseA, (x - eps) * s, y * s + t * 0.08, 3, 2, 0.5);
     const n1_y = fbm(curlNoiseA, x * s, (y + eps) * s + t * 0.08, 3, 2, 0.5);
@@ -107,26 +109,29 @@
     const n2_y = fbm(curlNoiseB, x * s + 100, (y + eps) * s - t * 0.06, 3, 2, 0.5);
     const n2_ym = fbm(curlNoiseB, x * s + 100, (y - eps) * s - t * 0.06, 3, 2, 0.5);
 
+    // curl = (dN1/dy, -dN1/dx) + (dN2/dy, -dN2/dx) 的变体
+    // 交叉构造旋转感
     const cx = (n1_y - n1_ym) / (2 * eps) - (n2_x - n2_xm) / (2 * eps);
     const cy = -(n1_x - n1_xm) / (2 * eps) - (n2_y - n2_ym) / (2 * eps);
 
-    // curl 幅度再减半（45 → 22），运动更缓慢
-    return { x: cx * 22, y: cy * 22 };
+    // curl 幅度再减半（22 → 11），运动极缓慢
+    return { x: cx * 11, y: cy * 11 };
   }
 
-  // ================== 全局风场（极弱，避免抖动） ==================
+  // ================== 全局风场（大尺度流动，curl 的底层） ==================
   const windNoiseA = makeNoise2D(777);
   const windNoiseB = makeNoise2D(888);
   let windTime = 0;
   function sampleAmbientWind(x, y) {
     const t = windTime;
-    // 环境风再减半，运动极缓慢
-    const wx = fbm(windNoiseA, x * 0.0012 + t * 0.02, y * 0.0012, 3, 2, 0.5) * 0.012 + 0.002;
-    const wy = fbm(windNoiseB, x * 0.0012, y * 0.0012 + t * 0.015, 3, 2, 0.5) * 0.006;
+    // 环境风再减半，且去掉恒定向右偏置（避免点击静止时云朝右上角飘）
+    // 只保留双向弱扰动（有正有负，平均为零）
+    const wx = fbm(windNoiseA, x * 0.0012 + t * 0.02, y * 0.0012, 3, 2, 0.5) * 0.006;
+    const wy = fbm(windNoiseB, x * 0.0012, y * 0.0012 + t * 0.015, 3, 2, 0.5) * 0.003;
     return { x: wx, y: wy };
   }
 
-  // ================== 云纹理 ==================
+  // ================== 云纹理（中式水墨：青灰 + 噪声腐蚀 + 偏纤丝） ==================
   function buildCloudTexture(style, seed) {
     const W = 512, H = 512;
     const tc = document.createElement('canvas');
@@ -155,6 +160,7 @@
         const r2 = dx * dx + dy * dy;
         let mask = Math.max(0, 1 - r2);
         mask = Math.pow(mask, style === 'wisp' ? 1.2 : 1.9);
+        // 边缘腐蚀加强 ×1.25（去蛋花颗粒感）
         const edgeNoise = fbm(noise, nx * 10 + seed * 0.02, ny * 10, 3, 2.2, 0.55);
         const edgeErode = Math.max(0, edgeNoise * 1.3 + (r2 > 0.5 ? (r2 - 0.5) * 2.6 : 0));
         mask = Math.max(0, mask - edgeErode * 0.9);
@@ -179,7 +185,7 @@
   };
   function randTexture(style) { return TEXTURE_POOL[style][(Math.random() * TEXTURE_POOL[style].length) | 0]; }
 
-  // ================== Wake 拖尾风场（延迟跟随感） ==================
+  // ================== Wake 拖尾风场（网格版，不上 ping-pong） ==================
   const WAKE_CELL = 36;
   let wakeCols = 0, wakeRows = 0;
   let wakeVX = null, wakeVY = null, wakeAge = null;
@@ -268,11 +274,19 @@
   canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
   // ==================================================================
-  // 粒子系统 V0.4：无残留 + 长寿命 + 慢速平稳 + 精准生成 + 无突然消失
-  // 生命周期：born(0~8%) → active(8~55%) → dissipating(55~100%) → 完整消散
+  // 粒子系统 V0.2：纯力积分 + curl 翻滚 + 生命周期 + 30% 湿痕
+  //
+  // 粒子不再有 anchor，不再回弹。
+  // 力来源：ambientWind（大尺度流） + curl（涡旋翻滚） + wake（手指残影） + pointerImpulse（直接冲量）
+  //
+  // 生命周期（均值 ~10s）:
+  //   0~12%   出生淡入：alpha 0→1，scale 0.4→1.0
+  //   12~40%  稳定翻滚：alpha=1，curl 主导旋转卷曲
+  //   40~85%  消散拉长：alpha 1→0.3，scale 1.0→1.8（扩散），速度阻尼降低（飘走）
+  //   85~100% 湿痕沉积：alpha 冻结 0.3，运动几乎停止，只留极淡底密度
   // ==================================================================
   const particles = [];
-  const MAX_PARTICLES = 650;
+  const MAX_PARTICLES = 2600; // 密度再加倍：1300 → 2600
 
   function spawnParticle(x, y, opts) {
     opts = opts || {};
@@ -281,6 +295,7 @@
 
     const r = Math.random();
     let style, depth;
+    // wisp 40%（更多纤丝飘带）、layer 48%（中景主体）、puff 12%（少团块）
     if (r < 0.40) { style = 'wisp'; depth = 0.35 + Math.random() * 0.15; }
     else if (r < 0.88) { style = 'layer'; depth = 0.65 + Math.random() * 0.15; }
     else { style = 'puff'; depth = 1.05 + Math.random() * 0.15; }
@@ -296,7 +311,6 @@
         : (0.09 + Math.random() * 0.11);
     const initScale = baseScale * (0.8 + depth * 0.4);
 
-    // spread 默认小（14），点哪里生成哪里
     const spread = opts.spread !== undefined ? opts.spread : 14;
     const sx = x + (Math.random() - 0.5) * spread;
     const sy = y + (Math.random() - 0.5) * spread;
@@ -314,17 +328,20 @@
       tex, style, depth,
       x: sx, y: sy,
       vx: initVX, vy: initVY,
-      // 翻滚参数：旋转幅度/速度减半（消除突然抖动）
+      // 翻滚参数
       rot: (Math.random() - 0.5) * 0.25,
       rotSpeed: (Math.random() - 0.5) * 0.0018 * (style === 'wisp' ? 0.3 : 1),
+      // 拉伸参数：消散期沿运动方向拉长
       stretchAngle: 0,
       stretchAmount: 0,
+      // 尺寸
       initScale,
-      curScale: initScale * 0.5,
+      curScale: initScale * 0.4,  // 出生时小
+      // 生命周期
       life: 0,
       lifespan,
-      phase: 'born', // born → active → dissipating
-      // baseAlpha 略提高，因为没有叠加湿痕
+      phase: 'born', // born → active → dissipating → dead
+      // 透明度（稍微提高基值，因为无残留叠加后整体可见）
       baseAlpha: style === 'puff'
         ? (depth > 1 ? 0.25 : 0.19)
         : style === 'layer'
@@ -332,12 +349,12 @@
           : 0.14,
       alpha: 0,
       squishY,
-      // spawn 时标记，避免首帧被 alpha 阈值误清理
+      // spawn 时先置 non-zero alpha 标记，避免首帧就被 alpha<0.004 误清理
       _born: true,
     });
   }
 
-  // ================== 指针交互 ==================
+  // ================== 指针交互：冲量扰动（不是原地加厚） ==================
   function getPos(e) {
     const rect = canvas.getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
@@ -348,6 +365,7 @@
   let lastPX = -9999, lastPY = -9999;
   let pointerVX = 0, pointerVY = 0;
   let spawnAccumulator = 0;
+  // 按住持续计时：用于生成少量新粒子（不是一堆蛋蛋）
   let holdTimer = 0;
 
   canvas.addEventListener('pointerdown', (e) => {
@@ -366,8 +384,8 @@
     pointerVX = 0; pointerVY = 0;
     spawnAccumulator = 0;
     holdTimer = 0;
-    // 点击生成 3-5 个，spread 极小（点哪里在哪里）
-    const burst = 3 + ((Math.random() * 3) | 0);
+    // 点击生成 12-20 个（密度再加倍），spread 极小（点哪里在哪里）
+    const burst = 12 + ((Math.random() * 9) | 0);
     for (let i = 0; i < burst; i++)
       spawnParticle(pointerX, pointerY, { spread: 18 });
   });
@@ -389,12 +407,12 @@
     pointerX = pos.x; pointerY = pos.y;
     lastPX = pointerX; lastPY = pointerY;
 
-    // 沉积 Wake 场（轻柔，避免强冲量导致飞溅）
+    // 沉积 Wake 场
     if (dist > 0.5) {
       depositWake(pointerX, pointerY, pointerVX * 0.04, pointerVY * 0.04, 1.0);
     }
 
-    // 对附近已有粒子施加轻柔冲量（纯跟随手指方向，不向外发散）
+    // 对附近已有粒子施加轻柔冲量（跟随手指，不向外发散避免羽绒飞溅）
     const impulseR = 90;
     const impulseR2 = impulseR * impulseR;
     const impulseStrength = Math.min(1.6, dist * 0.032);
@@ -405,25 +423,25 @@
       const pd2 = pdx * pdx + pdy * pdy;
       if (pd2 < impulseR2 && pd2 > 1) {
         const falloff = 1 - Math.sqrt(pd2) / impulseR;
-        // 纯跟随手指（去掉向外发散，消除飞溅）
+        // 纯跟随手指方向（去掉向外发散，消除飞溅）
         p.vx += pointerVX * 0.045 * falloff * impulseStrength;
         p.vy += pointerVY * 0.045 * falloff * impulseStrength;
       }
     }
 
-    // 沿轨迹生成新粒子（跟随手指速度，精准生成）
+    // 沿轨迹生成新粒子（密度再加倍：STEP 12→6，每步 4-6 个）
     const densityScale = Math.min(1.1, 0.5 + dist * 0.015);
     spawnAccumulator += dist * densityScale;
-    const STEP = 24;
+    const STEP = 6; // 步长再减半，密度再加倍
     while (spawnAccumulator >= STEP) {
       spawnAccumulator -= STEP;
       const t = 1 - (spawnAccumulator / STEP);
       const ix = lastPX - dx * t;
       const iy = lastPY - dy * t;
-      const n = 1 + ((Math.random() * 2) | 0);
+      const n = 4 + ((Math.random() * 3) | 0); // 每步 4-6 个（再加倍）
       for (let i = 0; i < n; i++)
         spawnParticle(ix, iy, {
-          vx: pointerVX * 0.045, // 高继承手指速度 → 跟随移动
+          vx: pointerVX * 0.045, // 继承手指速度，跟随移动
           vy: pointerVY * 0.045,
           spread: 10 + Math.min(15, dist * 0.1),
         });
@@ -479,39 +497,53 @@
 
     if (!isPointerDown) { pointerVX *= 0.9; pointerVY *= 0.9; }
 
-    // 按住不动：每 0.18s 生成 1 个（慢慢加厚，不突兀）
+    // 按住不放：持续生成新粒子（密度再加倍：0.09s → 0.045s 生成 1 个）
     if (isPointerDown) {
       holdTimer += dt;
-      if (holdTimer > 0.18) {
+      if (holdTimer > 0.045) { // 每 ~0.045s 生成 1 个（频率再加倍）
         holdTimer = 0;
         spawnParticle(pointerX, pointerY, { spread: 15, vx: pointerVX * 0.03, vy: pointerVY * 0.03 });
       }
     }
 
-    // ===== 粒子更新（无锚点、无固化残留、高阻尼、低速度上限） =====
+    // ===== 粒子更新（纯力积分，无锚点无回弹，无湿痕固化） =====
     for (let i = particles.length - 1; i >= 0; i--) {
       const p = particles[i];
       p.life += dt;
       const u = p.life / p.lifespan;
 
       // 三阶段：born(0~8%) → active(8~55%) → dissipating(55~100%)
+      // 注意：phase 仅用于力/尺寸分支，alpha 用全程 smoothstep 无拐点
       if (u < 0.08) p.phase = 'born';
       else if (u < 0.55) p.phase = 'active';
       else p.phase = 'dissipating';
 
-      // 全阶段受力（无固化阶段，粒子永远缓慢运动）
+      // === 力积分（全阶段持续受力，无固化阶段） ===
+      // 大尺度环境风
       const aw = sampleAmbientWind(p.x, p.y);
+      // curl 涡旋（弱翻滚）
       const cl = sampleCurl(p.x, p.y);
+      // wake 拖尾场（跟随手指延迟感）
       const wk = sampleWake(p.x, p.y);
 
+      // 力 → 加速度 → 速度
       const curlWeight = p.style === 'wisp' ? 0.25 : p.style === 'layer' ? 0.65 : 1.0;
       const windWeight = p.depth < 0.5 ? 1.3 : 1.0;
 
       let ax = aw.x * windWeight + cl.x * curlWeight * 0.012 + wk.x * 1.8;
       let ay = aw.y * windWeight + cl.y * curlWeight * 0.012 + wk.y * 1.8;
 
+      // 关键修复：静止粒子力衰减（点击不动时云停在原地聚集，不飘走）
+      // 只有 wake 场强（手指滑动过的残影）才让力恢复，保证滑动跟随
+      const curVlen = Math.hypot(p.vx, p.vy);
+      const wakeMag = Math.hypot(wk.x, wk.y);
+      // 静止且无 wake 时，力衰减到 8%（几乎停在原地，只做极弱呼吸）
+      const staticFactor = (curVlen < 0.15 && wakeMag < 0.05) ? 0.08 : 1.0;
+      ax *= staticFactor;
+      ay *= staticFactor;
+
       // 高阻尼（再提高）：消除抖动，运动更缓慢
-      const damping = p.phase === 'dissipating' ? 0.988 : (p.phase === 'born' ? 0.95 : 0.978);
+      const damping = p.phase === 'dissipating' ? 0.992 : (p.phase === 'born' ? 0.96 : 0.985);
       const dampPerFrame = Math.pow(damping, dtFrames);
 
       p.vx += ax * dtFrames;
@@ -519,11 +551,12 @@
       p.vx *= dampPerFrame;
       p.vy *= dampPerFrame;
 
-      // 低速度上限（3.2 → 1.6）：运动减半
-      const maxV = 1.6;
+      // 低速度上限（1.6 → 0.8）：运动再减半
+      const maxV = 0.8;
       const vlen = Math.hypot(p.vx, p.vy);
       if (vlen > maxV) { p.vx = p.vx / vlen * maxV; p.vy = p.vy / vlen * maxV; }
 
+      // 位置积分
       p.x += p.vx * dtFrames;
       p.y += p.vy * dtFrames;
 
@@ -531,39 +564,52 @@
       const rotMul = p.phase === 'dissipating' ? 0.7 : 1.0;
       p.rot += p.rotSpeed * dtFrames * rotMul;
 
-      // 消散期极微弱拉伸（轻柔）
+      // 消散期：极微弱沿运动方向拉伸（不突兀）
       if (p.phase === 'dissipating' && vlen > 0.15) {
         p.stretchAngle = Math.atan2(p.vy, p.vx);
-        const disU = (u - 0.55) / 0.45;
-        p.stretchAmount = disU * 0.22; // 最多拉伸 22%
+        const disU = (u - 0.55) / 0.45; // 0→1
+        p.stretchAmount = disU * 0.22; // 最多拉伸 22%（轻柔）
       }
 
-      // 尺寸：出生缓慢生长 + 消散轻微扩散 + active 极慢聚集
-      if (p.phase === 'born') {
-        const growU = u / 0.08;
-        p.curScale = p.initScale * (0.5 + 0.5 * growU);
-      } else if (p.phase === 'dissipating') {
-        const disU = (u - 0.55) / 0.45;
-        p.curScale = p.initScale * (1.0 + disU * 0.55);
+      // 尺寸：全程连续生长（无拐点），born 缓慢生长 → active 极缓聚集 → dissipating 轻微扩散
+      if (u < 0.08) {
+        // 出生：0.5 → 1.0（smoothstep）
+        const t = u / 0.08;
+        const s = t * t * (3 - 2 * t);
+        p.curScale = p.initScale * (0.5 + 0.5 * s);
+      } else if (u < 0.55) {
+        // active：1.0 → 1.15（极缓聚集）
+        const t = (u - 0.08) / (0.55 - 0.08);
+        p.curScale = p.initScale * (1.0 + t * 0.15);
       } else {
-        const actU = (u - 0.08) / (0.55 - 0.08);
-        p.curScale = p.initScale * (1.0 + actU * 0.15);
+        // dissipating：1.15 → 1.7（连续扩散，从 active 末端 1.15 接续）
+        const t = (u - 0.55) / 0.45;
+        p.curScale = p.initScale * (1.15 + t * 0.55);
       }
 
-      // === alpha：完整消散曲线（无残留），smoothstep 末端柔和 ===
+      // === alpha：全程 smoothstep 曲线，无恒定段，无拐点（根治气泡破裂感） ===
+      // 出生段(0~8%)平滑上升，平台段(8~55%)接近 1 但用极缓弧线过渡（避免 active→dissipating 拐点）
+      // 消散段(55~100%)平滑下降到 0
       let lifeAlpha;
-      if (p.phase === 'born') {
-        lifeAlpha = Math.pow(u / 0.08, 1.15);
-      } else if (p.phase === 'active') {
-        lifeAlpha = 1.0;
+      if (u < 0.08) {
+        // 出生淡入：smoothstep 0→1
+        const t = u / 0.08;
+        lifeAlpha = t * t * (3 - 2 * t);
+      } else if (u < 0.55) {
+        // 平台段：从 1 极缓下降到 0.96（避免恒定 1.0 造成拐点）
+        const t = (u - 0.08) / (0.55 - 0.08);
+        lifeAlpha = 1.0 - t * 0.04;
       } else {
-        // 缓慢完整消散：1 → 0，smoothstep 让尾部柔和（避免突然消失的抖动感）
-        const disU = (u - 0.55) / 0.45;
-        const t = Math.max(0, 1 - disU);
-        lifeAlpha = t * t * (3 - 2 * t); // smoothstep
+        // 消散段：从 0.96 平滑下降到 0（smoothstep，与平台段末端连续）
+        // 不做任何硬切，让 smoothstep 在 u=1.0 自然归零（remain=0 → lifeAlpha=0）
+        const t = (u - 0.55) / 0.45;
+        const remain = 1 - t;
+        lifeAlpha = 0.96 * remain * remain * (3 - 2 * remain);
       }
       p.alpha = p.baseAlpha * lifeAlpha;
-      if (p._born && p.life > 0.05) p._born = false;
+      // _born 保护期：直到 born 阶段结束（u>=0.08）才允许 alpha 阈值清理
+      // 避免 born 早期 alpha 接近 0 时被误删
+      if (p._born && u >= 0.08) p._born = false;
 
       // 屏幕外软切（超出边界才清理，且只在 alpha 已经很低时清理，避免可见时被剪）
       const offEdge = (p.x < -250 || p.x > viewW + 250 || p.y < -250 || p.y > viewH + 250);
@@ -571,9 +617,10 @@
         particles.splice(i, 1);
         continue;
       }
-      // 寿命结束彻底清理（u>=1 时 smoothstep 已归零，无视觉跳变）
-      // alpha 阈值降到 0.0006（远低于可见度，避免可见时被剪造成抖动）
-      if (u >= 1.0 || (!p._born && p.alpha < 0.0006)) {
+      // 寿命结束彻底清理（u>=1 时 smoothstep 已自然归零，无视觉跳变）
+      // 关键修复：清理阈值必须 < 渲染阈值(0.0003)，否则粒子在仍可见时被移除→气泡破裂
+      // 现在阈值 0.00005 远低于渲染阈值，粒子先淡出不可见，再被清理
+      if (u >= 1.0 || (!p._born && p.alpha < 0.00005)) {
         particles.splice(i, 1);
       }
     }
@@ -590,8 +637,9 @@
       ctx.drawImage(bgImg, viewW / 2 + bgX - cw / 2, viewH / 2 + bgY - ch / 2, cw, ch);
     }
 
-    // 先画 dissipating（底层、通透）再画 active + born（主体层）
+    // 先画 dissipating（消散层，最底层，最通透）
     drawLayer('dissipating', particles);
+    // 再画 active + born（主体层）
     drawLayer('active', particles);
 
     ctx.globalCompositeOperation = 'source-over';
@@ -599,26 +647,32 @@
   }
 
   function drawLayer(mode, list) {
+    // 消散层和主体层统一用 screen 混合（通透、云感自然）
     ctx.globalCompositeOperation = 'screen';
+
     for (let i = 0; i < list.length; i++) {
       const p = list[i];
+      // 分层渲染：只画对应 phase 的粒子
       if (mode === 'dissipating' && p.phase !== 'dissipating') continue;
       if (mode === 'active' && p.phase !== 'active' && p.phase !== 'born') continue;
 
       const a = p.alpha;
-      if (a < 0.0008) continue; // 阈值降到接近不可见，避免可见粒子被跳过造成抖动
+      if (a < 0.0003) continue; // 阈值再降，根治可见粒子被跳过造成的气泡破裂感
 
       const tw = p.tex.width * p.curScale;
       const th = p.tex.height * p.curScale * p.squishY;
 
       ctx.save();
       ctx.translate(p.x, p.y);
+
+      // 消散期拉伸：沿运动方向拉长
       if (p.stretchAmount > 0.01) {
         ctx.rotate(p.stretchAngle);
         ctx.scale(1 + p.stretchAmount, 1 - p.stretchAmount * 0.3);
       } else {
         ctx.rotate(p.rot);
       }
+
       ctx.globalAlpha = a;
       ctx.drawImage(p.tex, -tw / 2, -th / 2, tw, th);
       ctx.restore();
