@@ -102,12 +102,18 @@
   function injectCloudEvent(cx,cy,opt){
     const n = opt?.count??12, sp = opt?.spread??40, sb = opt?.scaleBias??1;
     const seed = (Date.now()^(cx*73856093)^(cy*19349663))>>>0; const rnd = srand(seed);
+    const injectVx=opt?.vx??0, injectVy=opt?.vy??0;
+    const hasInject=injectVx!==0||injectVy!==0;
+    const groupAng=rnd()*Math.PI*2, groupSpd=0.03+rnd()*0.04;
+    const gvx=hasInject?injectVx:Math.cos(groupAng)*groupSpd;
+    const gvy=hasInject?injectVy:Math.sin(groupAng)*groupSpd;
+    const groupDriftAng=hasInject?Math.atan2(injectVy,injectVx):groupAng;
+    const groupDriftSpd=hasInject?Math.hypot(injectVx,injectVy)*0.6:groupSpd*0.6;
     for (let i=0;i<n;i++){
       const t1=rnd(),t2=rnd(),r=Math.sqrt(t1)*sp,th=t2*Math.PI*2,dx=Math.cos(th)*r,dy=Math.sin(th)*r;
       const density = gauss(r,sp*0.55), x=cx+dx, y=cy+dy;
       const bs=(0.05+rnd()*MAX_SCALE_SPAN)*sb, ba=(0.06+rnd()*0.10)*(0.3+density*0.7);
-      const randAng=rnd()*Math.PI*2,randSpd=0.05+rnd()*0.08;
-      samplingPoints.push({x,y,vx:Math.cos(randAng)*randSpd+(opt?.vx??0),vy:Math.sin(randAng)*randSpd+(opt?.vy??0),selfDrift:randAng,selfDriftSpd:randSpd*0.6,rot:rnd()*Math.PI*2,rotSpeed:(rnd()-0.5)*0.004,scale:bs,curScale:bs,baseAlpha:ba,alpha:ba,density,tex:INK_TEXTURES[(seed+i)%8],depth:rnd(),stretchAmount:0,stretchAngle:0,breathSeed:rnd()*Math.PI*2,breathFreq:0.3+rnd()*0.8,squishY:0.78+rnd()*0.42,birthFrame:globalFrameCounter});
+      samplingPoints.push({x,y,vx:gvx+(rnd()-0.5)*0.01,vy:gvy+(rnd()-0.5)*0.01,selfDrift:groupDriftAng,selfDriftSpd:groupDriftSpd,rot:rnd()*Math.PI*2,rotSpeed:(rnd()-0.5)*0.004,scale:bs,curScale:bs,baseAlpha:ba,alpha:ba,density,tex:INK_TEXTURES[(seed+i)%8],depth:rnd(),stretchAmount:0,stretchAngle:0,breathSeed:rnd()*Math.PI*2,breathFreq:0.3+rnd()*0.8,squishY:0.78+rnd()*0.42,birthFrame:globalFrameCounter});
     }
     while(samplingPoints.length>MAX_COUNT_HARD){const i=((globalFrameCounter*13)>>>0)%samplingPoints.length;releaseSamplingPoint(i);}
   }
@@ -117,7 +123,7 @@
   let interactionMode='cloud';
   function getPos(e){const r=canvas.getBoundingClientRect();let cx,cy;if(e.touches&&e.touches[0]){cx=e.touches[0].clientX;cy=e.touches[0].clientY;}else{cx=e.clientX;cy=e.clientY;}return{x:(cx-r.left)*(canvas.width/dpr)/r.width,y:(cy-r.top)*(canvas.height/dpr)/r.height};}
   function pd(e){e.preventDefault();const p=getPos(e);px=p.x;py=p.y;pvx=pvy=0;down=true;holdT=0;if(expM===4&&stF===-1)stF=globalFrameCounter;if(interactionMode==='cloud')injectCloudEvent(px,py,{count:10});}
-  function pm(e){e.preventDefault();const p=getPos(e);const ox=px,oy=py;px=p.x;py=p.y;pvx=0.6*pvx+0.4*(px-ox);pvy=0.6*pvy+0.4*(py-oy);if(down){if(expM===4&&stF===-1)stF=globalFrameCounter;if(interactionMode==='cloud'){injectCloudEvent(px,py,{count:4,spread:20});autoRelTick();}const wa=Math.min(1.2,Math.hypot(pvx,pvy)*0.08);if(wa>0.04)depositWake(px,py,pvx*0.04,pvy*0.04,wa);}}
+  function pm(e){e.preventDefault();const p=getPos(e);const ox=px,oy=py;px=p.x;py=p.y;pvx=0.6*pvx+0.4*(px-ox);pvy=0.6*pvy+0.4*(py-oy);if(down){if(expM===4&&stF===-1)stF=globalFrameCounter;if(interactionMode==='cloud'){const spd=Math.hypot(pvx,pvy);if(spd>0.5){injectCloudEvent(px,py,{count:4,spread:20,vx:pvx*0.03,vy:pvy*0.03});}else{injectCloudEvent(px,py,{count:4,spread:20});}autoRelTick();}const wa=Math.min(1.2,spd*0.08);if(wa>0.04)depositWake(px,py,pvx*0.04,pvy*0.04,wa);}}
   function pu(){down=false;}
   canvas.addEventListener('mousedown',pd);window.addEventListener('mousemove',pm);window.addEventListener('mouseup',pu);
   canvas.addEventListener('touchstart',pd,{passive:false});canvas.addEventListener('touchmove',pm,{passive:false});canvas.addEventListener('touchend',pu);
@@ -243,7 +249,7 @@
     if(!down){pvx*=0.9;pvy*=0.9;}
     if(down&&expM===0){
       holdT+=dt;
-      if(holdT>0.145){holdT=0;injectCloudEvent(px,py,{count:4+((Math.random()*4)|0),spread:20,scaleBias:0.94,vx:pvx*0.03,vy:pvy*0.03});}
+      if(holdT>0.145){holdT=0;const spd=Math.hypot(pvx,pvy);injectCloudEvent(px,py,{count:4+((Math.random()*4)|0),spread:20,scaleBias:0.94,vx:spd>0.5?pvx*0.03:0,vy:spd>0.5?pvy*0.03:0});}
     }
     for(let i=samplingPoints.length-1;i>=0;i--){
       const s=samplingPoints[i];
