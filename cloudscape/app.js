@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const canvas = document.getElementById('cloudCanvas');
+  const canvas = document.getElementById('mainCanvas');
   const ctx = canvas.getContext('2d');
   let viewW = 0, viewH = 0, dpr = Math.max(1, window.devicePixelRatio || 1);
   function resizeCanvas() {
@@ -110,9 +110,10 @@
   let relT=0;
   function autoRelTick(){relT++;if(relT<60)return;relT=0;const ov=samplingPoints.length-TARGET_COUNT;if(ov<=0)return;const tr=Math.min(ov,60);for(let i=0;i<tr;i++){if(samplingPoints.length<=TARGET_COUNT)break;const idx=((globalFrameCounter*13+i*17)>>>0)%samplingPoints.length;releaseSamplingPoint(idx);}}
   let px=0,py=0,pvx=0,pvy=0,down=false,holdT=0;
+  let interactionMode='cloud';
   function getPos(e){const r=canvas.getBoundingClientRect();let cx,cy;if(e.touches&&e.touches[0]){cx=e.touches[0].clientX;cy=e.touches[0].clientY;}else{cx=e.clientX;cy=e.clientY;}return{x:(cx-r.left)*(canvas.width/dpr)/r.width,y:(cy-r.top)*(canvas.height/dpr)/r.height};}
-  function pd(e){e.preventDefault();const p=getPos(e);px=p.x;py=p.y;pvx=pvy=0;down=true;holdT=0;if(expM===4&&stF===-1)stF=globalFrameCounter;injectCloudEvent(px,py,{count:10});}
-  function pm(e){e.preventDefault();const p=getPos(e);const ox=px,oy=py;px=p.x;py=p.y;pvx=0.6*pvx+0.4*(px-ox);pvy=0.6*pvy+0.4*(py-oy);if(down){if(expM===4&&stF===-1)stF=globalFrameCounter;injectCloudEvent(px,py,{count:4,spread:20});const wa=Math.min(1.2,Math.hypot(pvx,pvy)*0.08);if(wa>0.04)depositWake(px,py,pvx*0.04,pvy*0.04,wa);autoRelTick();}}
+  function pd(e){e.preventDefault();const p=getPos(e);px=p.x;py=p.y;pvx=pvy=0;down=true;holdT=0;if(expM===4&&stF===-1)stF=globalFrameCounter;if(interactionMode==='cloud')injectCloudEvent(px,py,{count:10});}
+  function pm(e){e.preventDefault();const p=getPos(e);const ox=px,oy=py;px=p.x;py=p.y;pvx=0.6*pvx+0.4*(px-ox);pvy=0.6*pvy+0.4*(py-oy);if(down){if(expM===4&&stF===-1)stF=globalFrameCounter;if(interactionMode==='cloud'){injectCloudEvent(px,py,{count:4,spread:20});autoRelTick();}const wa=Math.min(1.2,Math.hypot(pvx,pvy)*0.08);if(wa>0.04)depositWake(px,py,pvx*0.04,pvy*0.04,wa);}}
   function pu(){down=false;}
   canvas.addEventListener('mousedown',pd);window.addEventListener('mousemove',pm);window.addEventListener('mouseup',pu);
   canvas.addEventListener('touchstart',pd,{passive:false});canvas.addEventListener('touchmove',pm,{passive:false});canvas.addEventListener('touchend',pu);
@@ -289,6 +290,15 @@
     }catch(e){console.warn('[留影] 导出失败：',e);}
   }
   window.takeScreenshot=takeScreenshot;
+  const btnCloud=document.getElementById('modeCloud'),btnDrag=document.getElementById('modeDrag');
+  if(btnCloud)btnCloud.addEventListener('click',()=>{interactionMode='cloud';btnCloud.classList.add('active');if(btnDrag)btnDrag.classList.remove('active');});
+  if(btnDrag)btnDrag.addEventListener('click',()=>{interactionMode='drag';btnDrag.classList.add('active');if(btnCloud)btnCloud.classList.remove('active');});
+  const bgUploader=document.getElementById('bgUploader');
+  if(bgUploader)bgUploader.addEventListener('change',(e)=>{const f=e.target.files[0];if(!f)return;const url=URL.createObjectURL(f);const img=new Image();img.onload=()=>{const sc=Math.min(viewW/img.naturalWidth,viewH/img.naturalHeight)*0.92;window._bgSet({url,scale:sc,dx:0,dy:0});};img.src=url;});
+  const clearBtn=document.getElementById('clearBtn');
+  if(clearBtn)clearBtn.addEventListener('click',()=>{samplingPoints.length=0;});
+  const snapBtn=document.getElementById('snapBtn');
+  if(snapBtn)snapBtn.addEventListener('click',takeScreenshot);
   resizeCanvas();lTS=performance.now();
   function f(ts){uR(ts);requestAnimationFrame(f);}
   requestAnimationFrame(f);
