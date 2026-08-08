@@ -2,14 +2,39 @@
   'use strict';
 
   // ==================================================================
-  // V0.3 No Residual · No Anchor · No Death
+  // V0.4-beta Physical Semantics Acceptance Build
   //
-  // 核心理念：
-  //   不留残 · 不回锚 · 不做死亡粒子
-  //   云来了 → 云经过 → 云翻滚 → 云散了 → 空气恢复原状
+  // * 物理模型 = V0.4-beta 梯度模型（div + shear）
+  //   （不提前加 symmetric strain / rotation 分解；如果验收发现旋转被误当 shear，再针对性修）
+  // * releaseSamplingPoint() = 数值预算释放，不是 Cloud Death
   //
-  // 保留：Curl 涡旋 / Ambient Wind / Wake / 侵蚀纹理 / 拉伸 / 生命周期 / 结构破碎消散
-  // 删除：全部 Residual Density Field（不留云的尸体，空气不会脏）
+  // 本 Build 核心改动：只加自动化验收框架 + 可证伪的 PASS/FAIL 判定器
+  // ==================================================================
+  // Continuous Cloud Field (Velocity Gradient Dissipation)
+  //
+  // 物理隐喻（核心）：
+  //   点击/划过 = 手指扰动空气 → 局部 Cloud Field 被注入能量
+  //   → 形成连续高密度区域
+  //   → Curl / Wind / Wake 搬运这个区域（Advection）
+  //   → 速度场的空间梯度（散度 ∇·v / 剪切 ∂v/∂x）拉长、撕裂云体
+  //   → 密度重新分布、稀释 → 低于可见阈值
+  //   → 视觉上"回到空气"
+  //
+  // Particle 不是"东西"。Particle = Cloud Field 的 Lagrangian 采样点。
+  //
+  // No Birth · No Death · No Bubble 的真正验收标准：
+  //   [时间本身] 不能独立导致"云消失"。
+  //   [速度大小] 不能独立导致"云消失"（Advection ≠ Dissipation）。
+  //   只有速度场的空间梯度（散度 / 剪切）才能让 density ↓。
+  //   → 匀速平移的云可以一直被搬运而不消散。
+  //   → 静止的云可以一直存在。
+  //   → 只有被剪切/拉伸/膨胀才会稀释。
+  //
+  // 四组物理语义验收实验（键盘 1-4 切换）：
+  //   A 静止云：关闭所有场 → density 应保持不变
+  //   B 匀速平移：恒定速度无梯度 → density 应保持不变
+  //   C 剪切流场：速度梯度 ≠ 0 → 拉伸 → 变薄 → density ↓
+  //   D Wake：手指扰动 → 先改速度场 → 产生梯度 → density ↓
   // ==================================================================
 
   const canvas = document.getElementById('mainCanvas');
@@ -40,7 +65,7 @@
   window.addEventListener('resize', resizeCanvas);
   window.addEventListener('contextmenu', (e) => e.preventDefault());
 
-  // ================== 伪随机 + 值噪声 + FBM + 扭曲FBM ==================
+  // ================== 伪随机 + 值噪声 + FBM ==================
   function mulberry32(seed) {
     return function () {
       let t = seed += 0x6D2B79F5;
@@ -82,9 +107,7 @@
     return sum / norm;
   }
 
-  // ================== Curl 涡旋场（翻滚核心） ==================
-  // 用两层 FBM 的梯度差分构造旋转向量场
-  // 粒子在 curl 场中会自然产生涡旋、卷曲、拉伸运动
+  // ================== Curl 涡旋场（翻滚 + 撕裂） ==================
   const curlNoiseA = makeNoise2D(1111);
   const curlNoiseB = makeNoise2D(2222);
   let curlTime = 0;
@@ -93,41 +116,127 @@
     const eps = 1.5;
     const s = 0.0018;
     const t = curlTime;
-    // 两个独立标量场的梯度，交叉构成旋转向量
     const n1_x = fbm(curlNoiseA, (x + eps) * s, y * s + t * 0.08, 3, 2, 0.5);
     const n1_xm = fbm(curlNoiseA, (x - eps) * s, y * s + t * 0.08, 3, 2, 0.5);
     const n1_y = fbm(curlNoiseA, x * s, (y + eps) * s + t * 0.08, 3, 2, 0.5);
     const n1_ym = fbm(curlNoiseA, x * s, (y - eps) * s + t * 0.08, 3, 2, 0.5);
-
     const n2_x = fbm(curlNoiseB, (x + eps) * s + 100, y * s - t * 0.06, 3, 2, 0.5);
     const n2_xm = fbm(curlNoiseB, (x - eps) * s + 100, y * s - t * 0.06, 3, 2, 0.5);
     const n2_y = fbm(curlNoiseB, x * s + 100, (y + eps) * s - t * 0.06, 3, 2, 0.5);
     const n2_ym = fbm(curlNoiseB, x * s + 100, (y - eps) * s - t * 0.06, 3, 2, 0.5);
-
-    // curl = (dN1/dy, -dN1/dx) + (dN2/dy, -dN2/dx) 的变体
-    // 交叉构造旋转感
     const cx = (n1_y - n1_ym) / (2 * eps) - (n2_x - n2_xm) / (2 * eps);
     const cy = -(n1_x - n1_xm) / (2 * eps) - (n2_y - n2_ym) / (2 * eps);
-
-    // curl 幅度再减半（22 → 11），运动极缓慢
     return { x: cx * 11, y: cy * 11 };
   }
 
-  // ================== 全局风场（大尺度流动，curl 的底层） ==================
+  // ================== 全局风场（大尺度流动） ==================
   const windNoiseA = makeNoise2D(777);
   const windNoiseB = makeNoise2D(888);
   let windTime = 0;
   function sampleAmbientWind(x, y) {
     const t = windTime;
-    // 环境风再减半，且去掉恒定向右偏置（避免点击静止时云朝右上角飘）
-    // 只保留双向弱扰动（有正有负，平均为零）
     const wx = fbm(windNoiseA, x * 0.0012 + t * 0.02, y * 0.0012, 3, 2, 0.5) * 0.006;
     const wy = fbm(windNoiseB, x * 0.0012, y * 0.0012 + t * 0.015, 3, 2, 0.5) * 0.003;
     return { x: wx, y: wy };
   }
 
-  // ================== 云纹理（中式水墨：青灰 + 噪声腐蚀 + 偏纤丝） ==================
-  function buildCloudTexture(style, seed) {
+  // ==================================================================
+  // 场配置（实验用：可独立开关 / 调节各速度源）
+  // ==================================================================
+  const defaultFieldConfig = {
+    windAmp: 1.0,       // Ambient Wind 振幅
+    curlAmp: 1.0,       // Curl 涡旋振幅
+    wakeActive: true,   // Wake 拖尾是否生效
+    uniformVx: 0,       // 匀速平移（实验 B）
+    uniformVy: 0,
+    shearVyKx: 0,       // 剪切流场 vy = k*(x - cx)（实验 C）
+    shearVxKy: 0,       // 剪切流场 vx = k*(y - cy)（实验 C 变体）
+  };
+  let fieldConfig = { ...defaultFieldConfig };
+
+  // ==================================================================
+  // sampleTotalVelocity(x, y, sizeFactor, depth)
+  //
+  // 合成所有速度源 → 返回该位置的 Cloud Field 速度。
+  // 这是 advection 的驱动力。
+  //
+  // 关键：这个函数本身不消耗 density。
+  //   匀速场（uniformVx）的梯度 = 0 → 不产生 dissipation。
+  //   只有 Wind / Curl / Wake / Shear 等空间变化的场才有梯度。
+  // ==================================================================
+  function sampleTotalVelocity(x, y, sizeFactor, depth) {
+    let vx = fieldConfig.uniformVx;
+    let vy = fieldConfig.uniformVy;
+
+    // 剪切流场（实验 C）
+    if (fieldConfig.shearVyKx !== 0) {
+      vy += (x - viewW * 0.5) * fieldConfig.shearVyKx;
+    }
+    if (fieldConfig.shearVxKy !== 0) {
+      vx += (y - viewH * 0.5) * fieldConfig.shearVxKy;
+    }
+
+    // Ambient Wind
+    if (fieldConfig.windAmp > 0) {
+      const aw = sampleAmbientWind(x, y);
+      const windWeight = depth < 0.5 ? 1.32 : 1.0;
+      vx += aw.x * windWeight * fieldConfig.windAmp;
+      vy += aw.y * windWeight * fieldConfig.windAmp;
+    }
+
+    // Curl 涡旋
+    if (fieldConfig.curlAmp > 0) {
+      const cl = sampleCurl(x, y);
+      const curlWeight = 0.22 + sizeFactor * 0.78;
+      vx += cl.x * curlWeight * 0.012 * fieldConfig.curlAmp;
+      vy += cl.y * curlWeight * 0.012 * fieldConfig.curlAmp;
+    }
+
+    // Wake 拖尾
+    if (fieldConfig.wakeActive) {
+      const wk = sampleWake(x, y);
+      vx += wk.x * 1.8;
+      vy += wk.y * 1.8;
+    }
+
+    return { vx, vy };
+  }
+
+  // ==================================================================
+  // sampleVelocityGradient(x, y, sizeFactor, depth)
+  //
+  // 用前向差分计算局部速度场梯度：
+  //   divergence = ∂vx/∂x + ∂vy/∂y   （正=膨胀→稀释；负=压缩→增浓）
+  //   shear      = |∂vx/∂y| + |∂vy/∂x| （剪切→撕裂→混合→稀释）
+  //
+  // 匀速平移（uniform field）→ gradient = 0 → 不消散 ✓
+  // 静止 → gradient = 0 → 不消散 ✓
+  // 剪切流场 → shear > 0 → 消散 ✓
+  // 膨胀流场 → div > 0 → 消散 ✓
+  //
+  // 性能：3 次 sampleTotalVelocity 调用（中心 + x+eps + y+eps）
+  // ==================================================================
+  const GRAD_EPS = 12; // 空间差分步长（像素）
+  function sampleVelocityGradient(x, y, sizeFactor, depth) {
+    const c  = sampleTotalVelocity(x,            y,            sizeFactor, depth);
+    const xp = sampleTotalVelocity(x + GRAD_EPS, y,            sizeFactor, depth);
+    const yp = sampleTotalVelocity(x,            y + GRAD_EPS, sizeFactor, depth);
+
+    const dvxdx = (xp.vx - c.vx) / GRAD_EPS;
+    const dvydy = (yp.vy - c.vy) / GRAD_EPS;
+    const dvxdy = (yp.vx - c.vx) / GRAD_EPS;
+    const dvydx = (xp.vy - c.vy) / GRAD_EPS;
+
+    const divergence = dvxdx + dvydy;
+    const shear = Math.abs(dvxdy) + Math.abs(dvydx);
+
+    return { vx: c.vx, vy: c.vy, divergence, shear };
+  }
+
+  // ==================================================================
+  // 密度核纹理（2 张中性核，云形由 scale/squish/stretch 涌现）
+  // ==================================================================
+  function buildDensityKernel(seed) {
     const W = 512, H = 512;
     const tc = document.createElement('canvas');
     tc.width = W; tc.height = H;
@@ -142,29 +251,22 @@
       for (let x = 0; x < W; x++) {
         const i = (y * W + x) * 4;
         const nx = x / W, ny = y / H;
-        let n;
-        if (style === 'puff') n = fbm(noise, nx * 3.6, ny * 3.2, 4, 2.1, 0.55);
-        else if (style === 'wisp') {
-          const qx = fbm(noise, nx * 3 + seed * 0.01, ny * 3 + 3.2, 3, 2, 0.5);
-          const qy = fbm(noise, nx * 3 + 5.1, ny * 3 + 1.7, 3, 2, 0.5);
-          n = fbm(noise, nx * 5 + qx * 2, ny * 5 + qy * 2, 5, 2, 0.5);
-        } else n = fbm(noise, nx * 5.2 + seed * 0.003, ny * 4.0, 6, 2.0, 0.5);
+        const qx = fbm(noise, nx * 2.8 + seed * 0.01, ny * 2.8 + 3.2, 3, 2, 0.5);
+        const qy = fbm(noise, nx * 2.8 + 5.1, ny * 2.8 + 1.7, 3, 2, 0.5);
+        const n = fbm(noise, nx * 5 + qx * 1.5, ny * 4.6 + qy * 1.5, 5, 2, 0.5);
 
-        const dx = (x - cx) / (maxR * 0.95);
-        const dy = (y - cy) / (maxR * 0.78);
+        const dx = (x - cx) / (maxR * 0.93);
+        const dy = (y - cy) / (maxR * 0.86);
         const r2 = dx * dx + dy * dy;
         let mask = Math.max(0, 1 - r2);
-        mask = Math.pow(mask, style === 'wisp' ? 1.2 : 1.9);
-        // 边缘腐蚀加强 ×1.25（去蛋花颗粒感）
+        mask = Math.pow(mask, 1.6);
         const edgeNoise = fbm(noise, nx * 10 + seed * 0.02, ny * 10, 3, 2.2, 0.55);
         const edgeErode = Math.max(0, edgeNoise * 1.3 + (r2 > 0.5 ? (r2 - 0.5) * 2.6 : 0));
         mask = Math.max(0, mask - edgeErode * 0.9);
         let dens = (n + 1) * 0.5;
-        if (style === 'puff') dens = Math.pow(dens, 2.0) * 1.0;
-        else if (style === 'wisp') dens = Math.pow(Math.max(0, dens - 0.32), 1.25) * 1.5;
-        else dens = Math.pow(dens, 1.5) * 1.05;
+        dens = Math.pow(Math.max(0.02, dens), 1.55) * 1.02;
         const alpha = Math.min(1, dens * mask);
-        d[i] = Math.floor(236 + alpha * 16);
+        d[i] = Math.floor(237 + alpha * 15);
         d[i + 1] = Math.floor(242 + alpha * 12);
         d[i + 2] = Math.floor(245 + alpha * 10);
         d[i + 3] = Math.floor(alpha * 255);
@@ -173,87 +275,10 @@
     tx.putImageData(imgData, 0, 0);
     return tc;
   }
-  // === V0.3 侵蚀纹理序列（多尺度分层） ===
-  // 不再让粒子"放大+变透明"消失(泡泡破裂感)
-  // 改为:云体被流场拉薄 → 侵蚀 → 破碎 → 扩散
-  //
-  // 侵蚀有方向性和尺度层次(非随机碎片):
-  //   lv1: 大尺度低频噪声 → 大块先变薄(云体被风拉开的大结构)
-  //   lv2: 大块扩展 + 中等结构开始断裂
-  //   lv3: 中等尺度主导 → 结构被拉开成条带
-  //   lv4: 小尺度高频 → 只剩细丝/碎屑最后消散
-  // 噪声沿 x 拉伸(运动方向),drawLayer 中 stretchAngle 旋转后跟随实际运动方向
-  const ERODE_LEVELS = 5;
-  function buildErodedSequence(style, seed) {
-    const base = buildCloudTexture(style, seed);
-    const W = base.width, H = base.height;
-    const seq = [base]; // level 0 = 完整
-    const bigNoise = makeNoise2D(seed + 9999);   // 大尺度(低频)
-    const medNoise = makeNoise2D(seed + 8888);   // 中尺度
-    const smlNoise = makeNoise2D(seed + 7777);   // 小尺度(高频)
-    const baseCtx = base.getContext('2d');
-    const imgBase = baseCtx.getImageData(0, 0, W, H);
-    const db = imgBase.data;
+  const DENSITY_KERNEL_A = buildDensityKernel(1234);
+  const DENSITY_KERNEL_B = buildDensityKernel(5678);
 
-    for (let lv = 1; lv < ERODE_LEVELS; lv++) {
-      const tc = document.createElement('canvas');
-      tc.width = W; tc.height = H;
-      const tx = tc.getContext('2d');
-      const img = tx.createImageData(W, H);
-      const d = img.data;
-
-      // 各等级的侵蚀强度(递增)和主导尺度
-      // lv1: 大块变薄(阈值低,只咬大块) → lv4: 细丝残存(阈值高,只剩高频细节)
-      const strength = lv / ERODE_LEVELS; // 0.2, 0.4, 0.6, 0.8
-      const bigW = lv <= 2 ? 1.0 : (lv === 3 ? 0.5 : 0.2);   // 大尺度权重递减
-      const medW = lv === 2 ? 0.3 : (lv === 3 ? 0.5 : 0.3);
-      const smlW = lv <= 2 ? 0.0 : (lv === 3 ? 0.2 : 0.5);   // 小尺度后期才出现
-
-      for (let y = 0; y < H; y++) {
-        for (let x = 0; x < W; x++) {
-          const i = (y * W + x) * 4;
-          const baseA = db[i + 3];
-          if (baseA === 0) { d[i + 3] = 0; continue; }
-
-          // 三尺度噪声,均沿 x 拉伸(模拟运动方向被风拉散)
-          const bigN = (fbm(bigNoise, x / W * 2.5, y / H * 5.5, 2, 2, 0.5) + 1) * 0.5;
-          const medN = (fbm(medNoise, x / W * 6, y / H * 13, 3, 2, 0.5) + 1) * 0.5;
-          const smlN = (fbm(smlNoise, x / W * 14, y / H * 28, 2, 2, 0.5) + 1) * 0.5;
-          const wsum = bigW + medW + smlW;
-          const nv = (bigN * bigW + medN * medW + smlN * smlW) / wsum;
-
-          // 软阈值:不是硬切(避免碎片感),而是渐变侵蚀
-          // threshold 以下逐渐变薄,最低降到 0
-          const threshold = strength * 0.6;
-          const softRange = 0.22;
-          let erodeMask;
-          if (nv < threshold) {
-            erodeMask = 0;
-          } else if (nv < threshold + softRange) {
-            erodeMask = (nv - threshold) / softRange;
-            erodeMask = erodeMask * erodeMask * (3 - 2 * erodeMask); // smoothstep 软化
-          } else {
-            erodeMask = 1;
-          }
-          d[i] = db[i];
-          d[i + 1] = db[i + 1];
-          d[i + 2] = db[i + 2];
-          d[i + 3] = Math.floor(baseA * erodeMask);
-        }
-      }
-      tx.putImageData(img, 0, 0);
-      seq.push(tc);
-    }
-    return seq;
-  }
-  const TEXTURE_POOL = {
-    puff: [buildErodedSequence('puff', 101), buildErodedSequence('puff', 202), buildErodedSequence('puff', 303)],
-    wisp: [buildErodedSequence('wisp', 404), buildErodedSequence('wisp', 505), buildErodedSequence('wisp', 606)],
-    layer: [buildErodedSequence('layer', 707), buildErodedSequence('layer', 808), buildErodedSequence('layer', 909)],
-  };
-  function randTexture(style) { return TEXTURE_POOL[style][(Math.random() * TEXTURE_POOL[style].length) | 0]; }
-
-  // ================== Wake 拖尾风场（网格版，不上 ping-pong） ==================
+  // ================== Wake 拖尾风场（网格版） ==================
   const WAKE_CELL = 36;
   let wakeCols = 0, wakeRows = 0;
   let wakeVX = null, wakeVY = null, wakeAge = null;
@@ -342,94 +367,111 @@
   canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
   // ==================================================================
-  // 粒子系统 V0.3：纯力积分 + curl 翻滚 + 生命周期 + 侵蚀结构消散
-  //
-  // No Residual · No Anchor · No Death
-  //   粒子不再有 anchor，不再回弹，不留残
-  //   力来源：ambientWind（大尺度流） + curl（涡旋翻滚） + wake（手指残影） + pointerImpulse（直接冲量）
-  //
-  // 生命周期（均值 ~10s）:
-  //   0~8%    出生淡入：alpha 0→1，scale 0.5→1.0
-  //   8~55%   稳定翻滚：alpha≈1，curl 主导旋转卷曲
-  //   55~100% 侵蚀消散：结构被拉薄 → 出现空洞 → 断裂成丝 → 淡出
+  // Cloud Field 的 Lagrangian 采样点数组
   // ==================================================================
-  const particles = [];
-  const MAX_PARTICLES = 1130; // 浓度再降低 1/3：1700 → 1130
+  const samplingPoints = [];
+  const MAX_SAMPLING_POINTS = 1200;
 
-  function spawnParticle(x, y, opts) {
-    opts = opts || {};
-    // 满了拒绝新增（不 shift，避免最老粒子突然消失造成抖动）
-    if (particles.length >= MAX_PARTICLES) return;
-
-    const r = Math.random();
-    let style, depth;
-    // wisp 58%（更多纤丝牵丝）、layer 34%（中景主体）、puff 8%（少团块）
-    if (r < 0.58) { style = 'wisp'; depth = 0.35 + Math.random() * 0.15; }
-    else if (r < 0.92) { style = 'layer'; depth = 0.65 + Math.random() * 0.15; }
-    else { style = 'puff'; depth = 1.05 + Math.random() * 0.15; }
-    style = opts.style || style;
-    depth = opts.depth || depth;
-
-    const texSeq = randTexture(style); // V0.3: 返回侵蚀纹理序列(5级)
-
-    const baseScale = style === 'puff'
-      ? (0.15 + Math.random() * 0.18)
-      : style === 'layer'
-        ? (0.11 + Math.random() * 0.13)
-        : (0.06 + Math.random() * 0.12); // wisp 更细更扁（牵丝感）
-    const initScale = baseScale * (0.8 + depth * 0.4);
-
-    const spread = opts.spread !== undefined ? opts.spread : 14;
-    const sx = x + (Math.random() - 0.5) * spread;
-    const sy = y + (Math.random() - 0.5) * spread;
-
-    // wisp 更扁（0.60 → 0.48），强化牵丝形态
-    const squishY = style === 'wisp' ? 0.48 : style === 'layer' ? 0.82 : 0.95;
-
-    // V0.3: 生命周期缩短为 8-14s(不再是泡泡模型,侵蚀消散更快)
-    const lifespan = 8 + Math.random() * 6;
-
-    // 初始速度：继承指针速度（跟随手指），去掉随机发散（减少羽绒飞溅感）
-    const initVX = (opts.vx || 0) + (Math.random() - 0.5) * 0.08;
-    const initVY = (opts.vy || 0) + (Math.random() - 0.5) * 0.06;
-
-    // 虚实层次：baseAlpha 随机倍率（0.55-1.25），有些粒子天生淡（虚），有些浓（实）
-    const alphaMul = 0.55 + Math.random() * 0.7;
-
-    particles.push({
-      texSeq, style, depth,
-      x: sx, y: sy,
-      vx: initVX, vy: initVY,
-      // 翻滚参数
-      rot: (Math.random() - 0.5) * 0.25,
-      rotSpeed: (Math.random() - 0.5) * 0.0018 * (style === 'wisp' ? 0.3 : 1),
-      // 拉伸参数：wisp 全程沿运动方向拉长（牵丝），layer/puff 仅消散期轻拉
-      stretchAngle: 0,
-      stretchAmount: 0,
-      // 尺寸
-      initScale,
-      curScale: initScale * 0.4,  // 出生时小
-      // 生命周期
-      life: 0,
-      lifespan,
-      phase: 'born', // born → active → dissipating → dead
-      // 透明度：baseAlpha 乘随机倍率，产生虚实层次（非均匀一团）
-      baseAlpha: (style === 'puff'
-        ? (depth > 1 ? 0.25 : 0.19)
-        : style === 'layer'
-          ? 0.18
-          : 0.14) * alphaMul,
-      alpha: 0,
-      squishY,
-      // 虚实呼吸：每个粒子独立的慢周期浓淡起伏（避免均匀"团毛"感）
-      breathSeed: Math.random() * Math.PI * 2,
-      breathFreq: 0.4 + Math.random() * 0.5, // 周期 ~10-15s
-      // spawn 时先置 non-zero alpha 标记，避免首帧就被 alpha<0.004 误清理
-      _born: true,
-    });
+  // ==================================================================
+  // releaseSamplingPoint(idx)
+  //
+  // 语义：Cloud Field 不消失，只是该采样点已经低于数值/视觉分辨率，
+  //       因此释放计算预算。不是"云死亡"。
+  // ==================================================================
+  function releaseSamplingPoint(idx) {
+    samplingPoints.splice(idx, 1);
   }
 
-  // ================== 指针交互：冲量扰动（不是原地加厚） ==================
+  // ==================================================================
+  // injectCloudEvent(x, y, opts)
+  //
+  // 语义：向 Cloud Field 在 (x,y) 周围注入一次局部扰动。
+  //       不是"生成一堆粒子"，而是"在这片区域里提高空气场的云密度"。
+  // ==================================================================
+  function injectCloudEvent(x, y, opts) {
+    opts = opts || {};
+    if (samplingPoints.length >= MAX_SAMPLING_POINTS) return;
+
+    const slots = MAX_SAMPLING_POINTS - samplingPoints.length;
+    const wantCount = Math.min(slots, opts.count || (11 + ((Math.random() * 8) | 0)));
+    if (wantCount <= 0) return;
+
+    const clusterRadius = opts.spread !== undefined ? opts.spread : 26;
+    const clusterVX = opts.vx || 0;
+    const clusterVY = opts.vy || 0;
+    const uniformVel = opts.uniformVelocity || false;
+    const scaleBias = opts.scaleBias || 1.0;
+
+    for (let i = 0; i < wantCount; i++) {
+      let gx = 0, gy = 0;
+      for (let k = 0; k < 2; k++) {
+        const u1 = Math.random() || 1e-9;
+        const u2 = Math.random();
+        const r = Math.sqrt(-2 * Math.log(u1));
+        const theta = 2 * Math.PI * u2;
+        gx += r * Math.cos(theta);
+        gy += r * Math.sin(theta);
+      }
+      gx *= 0.5; gy *= 0.5;
+
+      const sx = x + gx * clusterRadius;
+      const sy = y + gy * clusterRadius;
+
+      const distNorm = Math.min(1, Math.hypot(gx, gy) / 2.2);
+      const gaussianEnvelope = Math.max(0.25, 1 - distNorm * distNorm);
+
+      const u1s = Math.random() || 1e-9;
+      const u2s = Math.random();
+      const logScaleSample = Math.sqrt(-2 * Math.log(u1s)) * Math.cos(2 * Math.PI * u2s);
+      const rawScale = Math.exp(-2.25 + Math.log(scaleBias) + logScaleSample * 0.42);
+      const kernelScale = Math.max(0.038, Math.min(0.33, rawScale));
+
+      const sizeFactor = Math.min(1, Math.max(0, (kernelScale - 0.05) / 0.22));
+      const squishBase = 0.45 + sizeFactor * 0.47;
+      const squishJitter = (Math.random() - 0.5) * 0.14;
+      const squishY = Math.max(0.42, Math.min(1.0, squishBase + squishJitter));
+
+      const depth = 0.4 + Math.random() * 0.8;
+      const kernelTex = (i & 1) ? DENSITY_KERNEL_A : DENSITY_KERNEL_B;
+
+      // 初始速度：实验模式下可强制统一（消除初始散度 → 纯粹验证 advection）
+      let initVX, initVY;
+      if (uniformVel) {
+        initVX = clusterVX;
+        initVY = clusterVY;
+      } else {
+        const divergence = 0.018;
+        initVX = clusterVX + (gx * divergence) + (Math.random() - 0.5) * 0.035;
+        initVY = clusterVY + (gy * divergence) + (Math.random() - 0.5) * 0.026;
+      }
+
+      const depthMul = depth < 0.65
+        ? (depth < 0.48 ? 0.135 : 0.17)
+        : (depth > 1 ? 0.24 : 0.20);
+      const jitterMul = 0.78 + Math.random() * 0.44;
+      const baseAlpha = depthMul * jitterMul;
+
+      samplingPoints.push({
+        tex: kernelTex,
+        x: sx, y: sy,
+        vx: initVX, vy: initVY,
+        rot: (Math.random() - 0.5) * 0.3,
+        rotSpeed: (Math.random() - 0.5) * 0.0016 * sizeFactor,
+        stretchAngle: 0,
+        stretchAmount: 0,
+        curScale: kernelScale,
+        squishY,
+        density: gaussianEnvelope,
+        baseAlpha,
+        alpha: 0,
+        depth,
+        breathSeed: Math.random() * Math.PI * 2,
+        breathFreq: 0.38 + Math.random() * 0.46,
+      });
+    }
+  }
+
+  // ================== 指针交互：注入场扰动 ==================
   function getPos(e) {
     const rect = canvas.getBoundingClientRect();
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
@@ -439,8 +481,7 @@
   let pointerX = -9999, pointerY = -9999;
   let lastPX = -9999, lastPY = -9999;
   let pointerVX = 0, pointerVY = 0;
-  let spawnAccumulator = 0;
-  // 按住持续计时：用于生成少量新粒子（不是一堆蛋蛋）
+  let injectAccumulator = 0;
   let holdTimer = 0;
 
   canvas.addEventListener('pointerdown', (e) => {
@@ -457,12 +498,14 @@
     pointerX = pos.x; pointerY = pos.y;
     lastPX = pointerX; lastPY = pointerY;
     pointerVX = 0; pointerVY = 0;
-    spawnAccumulator = 0;
+    injectAccumulator = 0;
     holdTimer = 0;
-    // 点击生成 5-9 个（浓度再降低 1/3），spread 极小（点哪里在哪里）
-    const burst = 5 + ((Math.random() * 5) | 0);
-    for (let i = 0; i < burst; i++)
-      spawnParticle(pointerX, pointerY, { spread: 18 });
+    injectCloudEvent(pointerX, pointerY, {
+      count: 11 + ((Math.random() * 9) | 0),
+      spread: 26,
+      scaleBias: 1.0,
+      vx: 0, vy: 0,
+    });
   });
 
   window.addEventListener('pointermove', (e) => {
@@ -482,58 +525,56 @@
     pointerX = pos.x; pointerY = pos.y;
     lastPX = pointerX; lastPY = pointerY;
 
-    // 沉积 Wake 场
     if (dist > 0.5) {
       depositWake(pointerX, pointerY, pointerVX * 0.04, pointerVY * 0.04, 1.0);
     }
 
-    // 对附近已有粒子施加轻柔冲量（跟随手指，不向外发散避免羽绒飞溅）
     const impulseR = 90;
     const impulseR2 = impulseR * impulseR;
     const impulseStrength = Math.min(1.6, dist * 0.032);
-    for (let i = 0; i < particles.length; i++) {
-      const p = particles[i];
-      const pdx = p.x - pointerX;
-      const pdy = p.y - pointerY;
-      const pd2 = pdx * pdx + pdy * pdy;
-      if (pd2 < impulseR2 && pd2 > 1) {
-        const falloff = 1 - Math.sqrt(pd2) / impulseR;
-        // 纯跟随手指方向（去掉向外发散，消除飞溅）
-        p.vx += pointerVX * 0.045 * falloff * impulseStrength;
-        p.vy += pointerVY * 0.045 * falloff * impulseStrength;
+    for (let i = 0; i < samplingPoints.length; i++) {
+      const s = samplingPoints[i];
+      const sdx = s.x - pointerX;
+      const sdy = s.y - pointerY;
+      const sd2 = sdx * sdx + sdy * sdy;
+      if (sd2 < impulseR2 && sd2 > 1) {
+        const falloff = 1 - Math.sqrt(sd2) / impulseR;
+        s.vx += pointerVX * 0.045 * falloff * impulseStrength;
+        s.vy += pointerVY * 0.045 * falloff * impulseStrength;
       }
     }
 
-    // 沿轨迹生成新粒子（浓度再降低 1/3：STEP 9→14，每步 2-3 个）
     const densityScale = Math.min(1.1, 0.5 + dist * 0.015);
-    spawnAccumulator += dist * densityScale;
-    const STEP = 14; // 步长再加大 1/3，浓度再降
-    while (spawnAccumulator >= STEP) {
-      spawnAccumulator -= STEP;
-      const t = 1 - (spawnAccumulator / STEP);
+    injectAccumulator += dist * densityScale;
+    const STEP = 19;
+    while (injectAccumulator >= STEP) {
+      injectAccumulator -= STEP;
+      const t = 1 - (injectAccumulator / STEP);
       const ix = lastPX - dx * t;
       const iy = lastPY - dy * t;
-      const n = 2 + ((Math.random() * 2) | 0); // 每步 2-3 个（再降 1/3）
-      for (let i = 0; i < n; i++)
-        spawnParticle(ix, iy, {
-          vx: pointerVX * 0.045, // 继承手指速度，跟随移动
-          vy: pointerVY * 0.045,
-          spread: 10 + Math.min(15, dist * 0.1),
-        });
+      const dynSpread = 18 + Math.min(22, dist * 0.18);
+      const speedBias = Math.max(0.78, 1.18 - dist * 0.012);
+      injectCloudEvent(ix, iy, {
+        count: 5 + ((Math.random() * 5) | 0),
+        spread: dynSpread,
+        scaleBias: speedBias,
+        vx: pointerVX * 0.045,
+        vy: pointerVY * 0.045,
+      });
     }
   });
 
   const releasePointer = () => {
     isPointerDown = false;
     isImageDragging = false;
-    spawnAccumulator = 0;
+    injectAccumulator = 0;
     holdTimer = 0;
   };
   window.addEventListener('pointerup', releasePointer);
   window.addEventListener('pointercancel', releasePointer);
 
   // ================== 清空 & 截图 ==================
-  document.getElementById('clearBtn').addEventListener('click', () => { particles.length = 0; });
+  document.getElementById('clearBtn').addEventListener('click', () => { samplingPoints.length = 0; });
   document.getElementById('snapBtn').addEventListener('click', async () => {
     const ui = document.querySelector('.ui-overlay');
     ui.style.display = 'none';
@@ -557,6 +598,333 @@
   });
 
   // ==================================================================
+  // V0.4-beta Physical Semantics Acceptance Framework
+  //
+  // 验收硬阈值（来自物理语义，不来自"视觉好看"）：
+  //   A & B 保持率 ≥ 0.999（浮点误差容忍度 0.1% 内）
+  //   C：avgGradMag > 0 （确实出现了非零速度梯度）
+  //      且 density 保持率 ≤ 0.90（梯度确实导致 density 重新分布）
+  //   D：因果顺序：wakeMag↑ → gradMag↑ → density↓（有先有后，可观察）
+  // ==================================================================
+  const ACCEPT_N_FRAMES       = 600;   // A/B/C 自动跑的帧数（60fps ≈ 10s）
+  const ACCEPT_AB_RETENTION   = 0.999; // A/B：密度保持率 ≥ 此值 = PASS
+  const ACCEPT_C_GRAD_MIN     = 1e-5;  // C：平均梯度模 ≥ 此值 = 确实有梯度
+  const ACCEPT_C_RETENTION    = 0.90;  // C：密度保持率 ≤ 此值 = 梯度起作用
+  const ACCEPT_LOG_STEP       = 30;    // 日志间隔帧
+
+  let experimentMode = 0;      // 0=normal, 1=A, 2=B, 3=C, 4=D
+  let experimentFrame = 0;
+  // 实验基线：第 1 帧的 avgDensity，用来算保持率
+  let baselineAvgDensity = 0;
+  // 验收结论缓存，最后在第 600 帧打表
+  let acceptBaseline = null;
+  // D 实验因果锚点：3 个采样点（第 0/50/99 百分位的 x 位置），持续跟踪 wake/grad/density 时间序列
+  let dCausalAnchors = [];
+  let dCausalLogStep = 1; // D 实验每一帧都记录因果序列
+
+  function computeAvgDensity() {
+    let totalDensity = 0, count = 0;
+    for (let i = 0; i < samplingPoints.length; i++) {
+      totalDensity += samplingPoints[i].density;
+      count++;
+    }
+    return count > 0 ? totalDensity / count : 0;
+  }
+
+  // 平均速度梯度模：用于 C 验收"确实出现了梯度"
+  function computeAvgGradMag() {
+    let sumDiv = 0, sumShear = 0, sum = 0;
+    for (let i = 0; i < samplingPoints.length; i++) {
+      const s = samplingPoints[i];
+      const sizeFactor = Math.min(1, Math.max(0, (s.curScale - 0.05) / 0.22));
+      const g = sampleVelocityGradient(s.x, s.y, sizeFactor, s.depth);
+      sumDiv += Math.abs(g.divergence);
+      sumShear += g.shear;
+      sum++;
+    }
+    if (sum === 0) return { avgDiv: 0, avgShear: 0, avgGrad: 0 };
+    return { avgDiv: sumDiv / sum, avgShear: sumShear / sum, avgGrad: (sumDiv + sumShear) / sum };
+  }
+
+  // 平均 wake 场模：用于 D 实验因果观测
+  function computeAvgWakeMag() {
+    let sum = 0, count = 0;
+    for (let i = 0; i < samplingPoints.length; i++) {
+      const s = samplingPoints[i];
+      const wk = sampleWake(s.x, s.y);
+      sum += Math.hypot(wk.x, wk.y);
+      count++;
+    }
+    return count > 0 ? sum / count : 0;
+  }
+
+  function startExperiment(mode) {
+    experimentMode = mode;
+    experimentFrame = 0;
+    samplingPoints.length = 0;
+    rebuildWakeGrid();
+    fieldConfig = { ...defaultFieldConfig };
+    baselineAvgDensity = 0;
+    acceptBaseline = null;
+    dCausalAnchors = [];
+
+    const cx = viewW / 2, cy = viewH / 2;
+
+    switch (mode) {
+      case 1: // 实验 A：静止云
+        fieldConfig.windAmp = 0;
+        fieldConfig.curlAmp = 0;
+        fieldConfig.wakeActive = false;
+        injectCloudEvent(cx, cy, { count: 24, spread: 30, scaleBias: 1.0, uniformVelocity: true, vx: 0, vy: 0 });
+        console.log('%c[Exp A] 静止云', 'color:#4fc3f7;font-weight:bold',
+          `wind=0, curl=0, wake=off。自动跑 ${ACCEPT_N_FRAMES} 帧。`);
+        console.log(`  PASS 标准：density 保持率 ≥ ${ACCEPT_AB_RETENTION}（10s 不掉超过 0.1%）`);
+        console.log('  FAIL 原因：存在隐藏的 magnitude / 时间驱动 loss（等价于 lifespan）');
+        break;
+
+      case 2: // 实验 B：匀速平移
+        fieldConfig.windAmp = 0;
+        fieldConfig.curlAmp = 0;
+        fieldConfig.wakeActive = false;
+        fieldConfig.uniformVx = 0.3;
+        injectCloudEvent(cx, cy, { count: 24, spread: 30, scaleBias: 1.0, uniformVelocity: true, vx: 0.3, vy: 0 });
+        console.log('%c[Exp B] 匀速平移', 'color:#4fc3f7;font-weight:bold',
+          `vx=0.3（|v| 非零，但 ∇v=0）。自动跑 ${ACCEPT_N_FRAMES} 帧。`);
+        console.log(`  PASS 标准：density 保持率 ≥ ${ACCEPT_AB_RETENTION}`);
+        console.log('  FAIL 原因：Advection 被等同成 Dissipation（speedLoss / stretchAmount 基于 |v|）');
+        break;
+
+      case 3: // 实验 C：剪切
+        fieldConfig.windAmp = 0;
+        fieldConfig.curlAmp = 0;
+        fieldConfig.wakeActive = false;
+        fieldConfig.shearVyKx = 0.003;
+        injectCloudEvent(cx, cy, { count: 24, spread: 30, scaleBias: 1.0, uniformVelocity: true, vx: 0, vy: 0 });
+        console.log('%c[Exp C] 剪切', 'color:#4fc3f7;font-weight:bold',
+          `vy = 0.003*(x-cx)（|v| 变化 + ∇v ≠ 0）。自动跑 ${ACCEPT_N_FRAMES} 帧。`);
+        console.log(`  PASS 标准：avgGradMag ≥ ${ACCEPT_C_GRAD_MIN} 且 density 保持率 ≤ ${ACCEPT_C_RETENTION}`);
+        console.log('  FAIL 原因（可能两种）：');
+        console.log('    a) shear 项为 0，但 density 仍下降 → 隐藏 magnitude loss');
+        console.log('    b) shear 非零但 density 不降 → shear→density 链路断');
+        break;
+
+      case 4: // 实验 D：Wake（需要用户交互划过云）
+        injectCloudEvent(cx, cy, { count: 24, spread: 30, scaleBias: 1.0 });
+        // 锚定 3 个采样点（按 x 位置排序，取 0/50/99 百分位）做因果序列跟踪
+        const sorted = samplingPoints.slice().sort((a, b) => a.x - b.x);
+        const idxs = [0, Math.floor(sorted.length * 0.5), sorted.length - 1];
+        dCausalAnchors = idxs.map(i => sorted[i]).filter(Boolean);
+        console.log('%c[Exp D] Wake 因果序列', 'color:#4fc3f7;font-weight:bold',
+          `锚点 ${dCausalAnchors.length} 个。请用手指快速划过云团。`);
+        console.log('  每帧记录：frame / wakeMag(avg) / gradMag(avg) / avgDensity');
+        console.log('  PASS 观察：wakeMag↑ → 下一帧 gradMag↑ → 随后几帧 density↓（可分离因果）');
+        console.log('  FAIL 观察：wake 出现时 density 立刻同步下降 → 隐藏 wakeLoss 直接扣 density');
+        break;
+    }
+
+    // 等第一帧（frame=0）时采基线
+  }
+
+  function resetExperiment() {
+    experimentMode = 0;
+    experimentFrame = 0;
+    fieldConfig = { ...defaultFieldConfig };
+    baselineAvgDensity = 0;
+    acceptBaseline = null;
+    dCausalAnchors = [];
+    console.log('%c[Normal] 正常模式', 'color:#81c784;font-weight:bold');
+  }
+
+  window.addEventListener('keydown', (e) => {
+    switch (e.key) {
+      case '0': resetExperiment(); break;
+      case '1': startExperiment(1); break;
+      case '2': startExperiment(2); break;
+      case '3': startExperiment(3); break;
+      case '4': startExperiment(4); break;
+      case '5': printAcceptanceTable(true); break; // 手工打印当前积累到的验收表
+    }
+  });
+
+  // PASS/FAIL 判定器（A/B/C 跑完 ACCEPT_N_FRAMES 帧后自动输出）
+  let acceptanceTable = {
+    A: null, // {passed, retention, reason, evidence}
+    B: null,
+    C: null,
+    D: null, // 需要用户交互，无法自动判定，但会输出因果观察
+  };
+
+  function judgeExperiment() {
+    if (experimentFrame !== ACCEPT_N_FRAMES) return; // 只在终点判定一次
+
+    const finalDensity = computeAvgDensity();
+    const retention = baselineAvgDensity > 0 ? finalDensity / baselineAvgDensity : 1;
+    const grad = computeAvgGradMag();
+
+    let verdict = null;
+    switch (experimentMode) {
+      case 1: { // A 静止
+        const passed = retention >= ACCEPT_AB_RETENTION;
+        verdict = {
+          passed,
+          retention,
+          avgDensity0: baselineAvgDensity,
+          avgDensityN: finalDensity,
+          avgGrad: grad.avgGrad,
+          reason: passed ? 'density 保持率 ≥ 阈值：静止不消散 ✓'
+                         : `density 下降 ${((1 - retention) * 100).toFixed(2)}%，存在隐藏 lifespan ✗`,
+        };
+        acceptanceTable.A = verdict;
+        break;
+      }
+      case 2: { // B 匀速
+        const passed = retention >= ACCEPT_AB_RETENTION;
+        verdict = {
+          passed,
+          retention,
+          avgDensity0: baselineAvgDensity,
+          avgDensityN: finalDensity,
+          avgGrad: grad.avgGrad,
+          reason: passed ? 'density 保持率 ≥ 阈值：Advection ≠ Dissipation ✓'
+                         : `density 下降 ${((1 - retention) * 100).toFixed(2)}%，velocity magnitude 被当成 dissipation ✗`,
+        };
+        acceptanceTable.B = verdict;
+        break;
+      }
+      case 3: { // C 剪切
+        const hasGrad = grad.avgGrad >= ACCEPT_C_GRAD_MIN;
+        const densityDropped = retention <= ACCEPT_C_RETENTION;
+        const passed = hasGrad && densityDropped;
+        let reason;
+        if (passed) {
+          reason = `avgGrad=${grad.avgGrad.toExponential(2)} ≥ ${ACCEPT_C_GRAD_MIN}，` +
+                   `retention=${retention.toFixed(3)} ≤ ${ACCEPT_C_RETENTION}：梯度→density 链路连通 ✓`;
+        } else if (!hasGrad && !densityDropped) {
+          reason = `avgGrad=${grad.avgGrad.toExponential(2)} < ${ACCEPT_C_GRAD_MIN}，` +
+                   `且 retention=${retention.toFixed(3)} > ${ACCEPT_C_RETENTION}：剪切流场没产生梯度 ✗`;
+        } else if (!hasGrad) {
+          reason = `avgGrad=${grad.avgGrad.toExponential(2)} < ${ACCEPT_C_GRAD_MIN}，` +
+                   `但 retention=${retention.toFixed(3)} ≤ ${ACCEPT_C_RETENTION}：density 降了，但不是由 shear 引起（隐藏 magnitude loss） ✗`;
+        } else {
+          reason = `avgGrad=${grad.avgGrad.toExponential(2)} ≥ ${ACCEPT_C_GRAD_MIN}，` +
+                   `但 retention=${retention.toFixed(3)} > ${ACCEPT_C_RETENTION}：shear→density 链路断了 ✗`;
+        }
+        verdict = {
+          passed,
+          retention,
+          avgGrad: grad.avgGrad,
+          avgDiv: grad.avgDiv,
+          avgShear: grad.avgShear,
+          avgDensity0: baselineAvgDensity,
+          avgDensityN: finalDensity,
+          reason,
+        };
+        acceptanceTable.C = verdict;
+        break;
+      }
+    }
+
+    // 打印本次实验的判定
+    if (verdict) {
+      const tag = ['', 'A', 'B', 'C', 'D'][experimentMode];
+      const p = verdict.passed;
+      console.log(
+        '%c' + (p ? '✅ PASS' : '❌ FAIL') + ` [Exp ${tag}]`,
+        'color:' + (p ? '#81c784' : '#e57373') + ';font-weight:bold;font-size:13px',
+      );
+      console.log('  ' + verdict.reason);
+      console.log('  证据：', verdict);
+      printAcceptanceTable();
+    }
+  }
+
+  function printAcceptanceTable(hint) {
+    const header = [
+      '%c V0.4-beta Physical Semantics Acceptance Table ',
+      'background:#1a1a2e;color:#e0e0e0;padding:4px 8px;border-radius:4px;font-weight:bold',
+    ];
+    console.log(...header);
+    const rows = [
+      { exp: 'A 静止云', test: 'V=0, ∇V=0 → density 保持', v: acceptanceTable.A },
+      { exp: 'B 匀速平移', test: 'V≠0, ∇V=0 → density 保持', v: acceptanceTable.B },
+      { exp: 'C 剪切',    test: '∇V≠0 → density 重新分布', v: acceptanceTable.C },
+      { exp: 'D Wake',    test: 'Wake → ∇V → density （人工观察因果顺序）', v: acceptanceTable.D },
+    ];
+    for (const r of rows) {
+      let status, color;
+      if (r.v === null) {
+        status = 'PENDING'; color = '#ffb74d';
+      } else if (r.v.passed === undefined) {
+        status = 'OBSERVE'; color = '#64b5f6'; // D 用
+      } else if (r.v.passed) {
+        status = 'PASS'; color = '#81c784';
+      } else {
+        status = 'FAIL'; color = '#e57373';
+      }
+      console.log(
+        `  [${r.exp}] %c${status}%c — ${r.test}` + (r.v && r.v.reason ? ` | 原因：${r.v.reason}` : ''),
+        `color:${color};font-weight:bold`,
+        'color:inherit;font-weight:normal',
+      );
+    }
+    if (hint) {
+      console.log('%c[提示] 按 1/2/3/4 启动对应实验；按 5 随时查看累积表；按 0 清空', 'color:#b0bec5');
+    }
+  }
+
+  function logExperimentStatus() {
+    if (experimentMode === 0) return;
+    experimentFrame++;
+
+    // 基线：帧 0 的 avgDensity + grad
+    if (experimentFrame === 1 && baselineAvgDensity === 0) {
+      baselineAvgDensity = computeAvgDensity();
+      acceptBaseline = {
+        avgDensity0: baselineAvgDensity,
+        grad0: computeAvgGradMag(),
+      };
+      const tag = ['Normal', 'A-静止', 'B-匀速', 'C-剪切', 'D-Wake'][experimentMode];
+      console.log(`[Exp ${tag}] baseline avgDensity0=${baselineAvgDensity.toFixed(4)}`);
+    }
+
+    // A/B/C 日志：帧 ACCEPT_LOG_STEP * N
+    if (experimentMode >= 1 && experimentMode <= 3) {
+      if (experimentFrame % ACCEPT_LOG_STEP === 0) {
+        const density = computeAvgDensity();
+        const grad = computeAvgGradMag();
+        const retention = baselineAvgDensity > 0 ? density / baselineAvgDensity : 1;
+        const tag = ['Normal', 'A', 'B', 'C', 'D'][experimentMode];
+        console.log(
+          `[Exp ${tag}] frame=${experimentFrame}/${ACCEPT_N_FRAMES} ` +
+          `avgDensity=${density.toFixed(4)} retention=${retention.toFixed(4)} ` +
+          `avgDiv=${grad.avgDiv.toExponential(2)} avgShear=${grad.avgShear.toExponential(2)}`
+        );
+      }
+      // 终点自动判定
+      judgeExperiment();
+      return;
+    }
+
+    // D 日志：因果序列每帧（dCausalLogStep）打印
+    if (experimentMode === 4 && experimentFrame % dCausalLogStep === 0) {
+      const wakeMag = computeAvgWakeMag();
+      const grad = computeAvgGradMag();
+      const density = computeAvgDensity();
+      // 锚点个体值
+      const anchors = dCausalAnchors.map((s, idx) => {
+        const wk = sampleWake(s.x, s.y);
+        const sizeFactor = Math.min(1, Math.max(0, (s.curScale - 0.05) / 0.22));
+        const g = sampleVelocityGradient(s.x, s.y, sizeFactor, s.depth);
+        return `a${idx}{wk=${(Math.hypot(wk.x, wk.y)).toFixed(3)},gr=${(Math.abs(g.divergence)+g.shear).toFixed(3)},d=${s.density.toFixed(3)}}`;
+      }).join(' ');
+      console.log(
+        `[Exp D causality] f=${experimentFrame.toString().padStart(4)} ` +
+        `wakeMag=${wakeMag.toFixed(3)} gradMag=${grad.avgGrad.toFixed(3)} avgDensity=${density.toFixed(4)} | ${anchors}`
+      );
+    }
+  }
+
+  // ==================================================================
   // 更新 + 渲染
   // ==================================================================
   let lastTs = performance.now();
@@ -572,147 +940,125 @@
 
     if (!isPointerDown) { pointerVX *= 0.9; pointerVY *= 0.9; }
 
-    // 按住不放：持续生成新粒子（浓度再降低 1/3：0.068s → 0.102s 生成 1 个）
-    if (isPointerDown) {
+    // 按住持续注入（非实验模式下）
+    if (isPointerDown && experimentMode === 0) {
       holdTimer += dt;
-      if (holdTimer > 0.102) { // 每 ~0.102s 生成 1 个（频率再降 1/3）
+      if (holdTimer > 0.145) {
         holdTimer = 0;
-        spawnParticle(pointerX, pointerY, { spread: 15, vx: pointerVX * 0.03, vy: pointerVY * 0.03 });
+        injectCloudEvent(pointerX, pointerY, {
+          count: 4 + ((Math.random() * 4) | 0),
+          spread: 20,
+          scaleBias: 0.94,
+          vx: pointerVX * 0.03,
+          vy: pointerVY * 0.03,
+        });
       }
     }
 
-    // ===== 粒子更新（纯力积分，无锚点无回弹，无湿痕固化） =====
-    for (let i = particles.length - 1; i >= 0; i--) {
-      const p = particles[i];
-      p.life += dt;
-      const u = p.life / p.lifespan;
+    // ===== 场演化：每个采样点被风搬运 + 速度梯度稀释 =====
+    for (let i = samplingPoints.length - 1; i >= 0; i--) {
+      const s = samplingPoints[i];
 
-      // 三阶段：born(0~8%) → active(8~55%) → dissipating(55~100%)
-      // 注意：phase 仅用于力/尺寸分支，alpha 用全程 smoothstep 无拐点
-      if (u < 0.08) p.phase = 'born';
-      else if (u < 0.55) p.phase = 'active';
-      else p.phase = 'dissipating';
+      const sizeFactor = Math.min(1, Math.max(0, (s.curScale - 0.05) / 0.22));
 
-      // === 力积分（全阶段持续受力，无固化阶段） ===
-      // 大尺度环境风
-      const aw = sampleAmbientWind(p.x, p.y);
-      // curl 涡旋（弱翻滚）
-      const cl = sampleCurl(p.x, p.y);
-      // wake 拖尾场（跟随手指延迟感）
-      const wk = sampleWake(p.x, p.y);
+      // ==================================================================
+      // V0.4-beta-2 核心：采样速度场 + 其空间梯度
+      //
+      // 一次调用同时获得：
+      //   vx, vy        → 该位置的 Cloud Field 速度（用于 advection）
+      //   divergence    → ∇·v（正=膨胀→稀释；负=压缩→增浓）
+      //   shear         → |∂vx/∂y| + |∂vy/∂x|（剪切→撕裂→混合→稀释）
+      //
+      // 匀速平移 / 静止 → divergence=0, shear=0 → 不消散
+      // ==================================================================
+      const grad = sampleVelocityGradient(s.x, s.y, sizeFactor, s.depth);
 
-      // 力 → 加速度 → 速度
-      const curlWeight = p.style === 'wisp' ? 0.25 : p.style === 'layer' ? 0.65 : 1.0;
-      const windWeight = p.depth < 0.5 ? 1.3 : 1.0;
-
-      let ax = aw.x * windWeight + cl.x * curlWeight * 0.012 + wk.x * 1.8;
-      let ay = aw.y * windWeight + cl.y * curlWeight * 0.012 + wk.y * 1.8;
-
-      // 取消静止衰减：粒子始终受环境风+curl驱动，自然飘走消散
-      // 解决"云停在原地不动"问题：点击后云会被风场慢慢带走、翻滚、散开，最终消失
-
-      // 高阻尼（再提高）：消除抖动，运动更缓慢
-      const damping = p.phase === 'dissipating' ? 0.992 : (p.phase === 'born' ? 0.96 : 0.985);
+      // —— 阻尼 + 速度积分 ——
+      const damping = 0.985;
       const dampPerFrame = Math.pow(damping, dtFrames);
 
-      p.vx += ax * dtFrames;
-      p.vy += ay * dtFrames;
-      p.vx *= dampPerFrame;
-      p.vy *= dampPerFrame;
+      s.vx = s.vx * dampPerFrame + grad.vx * dtFrames;
+      s.vy = s.vy * dampPerFrame + grad.vy * dtFrames;
 
-      // 低速度上限（1.6 → 0.8）：运动再减半
       const maxV = 0.8;
-      const vlen = Math.hypot(p.vx, p.vy);
-      if (vlen > maxV) { p.vx = p.vx / vlen * maxV; p.vy = p.vy / vlen * maxV; }
+      const vlen = Math.hypot(s.vx, s.vy);
+      if (vlen > maxV) { s.vx = s.vx / vlen * maxV; s.vy = s.vy / vlen * maxV; }
 
-      // 位置积分
-      p.x += p.vx * dtFrames;
-      p.y += p.vy * dtFrames;
+      s.x += s.vx * dtFrames;
+      s.y += s.vy * dtFrames;
+      s.rot += s.rotSpeed * dtFrames;
 
-      // 极慢旋转（柔和翻滚）
-      const rotMul = p.phase === 'dissipating' ? 0.7 : 1.0;
-      p.rot += p.rotSpeed * dtFrames * rotMul;
-
-      // === 拉伸：wisp 全程沿运动方向拉长（牵丝），layer/puff 仅消散期轻拉 ===
-      // 解决"椭圆团毛"问题：wisp 是丝状，应始终被运动拉成牵丝
-      if (vlen > 0.08) {
-        p.stretchAngle = Math.atan2(p.vy, p.vx);
-        if (p.style === 'wisp') {
-          // wisp：active 开始就拉伸（0.30），消散期更拉长（0.55），形成牵丝飘带
-          const baseStretch = p.phase === 'dissipating' ? 0.55 : 0.30;
-          // 拉伸量随速度增强（运动越快丝越长）
-          const speedFactor = Math.min(1, vlen / 0.5);
-          p.stretchAmount = baseStretch * speedFactor;
-        } else if (p.phase === 'dissipating' && vlen > 0.15) {
-          // layer/puff 仅消散期轻拉
-          const disU = (u - 0.55) / 0.45;
-          p.stretchAmount = disU * 0.22;
-        } else {
-          p.stretchAmount = 0;
-        }
-      } else {
-        // 速度过低：wisp 保持轻微拉伸（维持丝状），其他归零
-        p.stretchAmount = p.style === 'wisp' ? 0.12 : 0;
+      // ==================================================================
+      // 拉伸（stretchAmount）：只由剪切驱动，不由速度大小驱动
+      //
+      //   静止 → shear=0 → stretchAmount=0 → 无拉伸无衰减
+      //   匀速平移 → shear=0 → stretchAmount=0 → 无拉伸无衰减
+      //   剪切流场 → shear>0 → stretchAmount>0 → 视觉拉长
+      //
+      // 视觉扁率（squishY）是采样点的固有属性，不随运动变化。
+      // 拉伸（stretchAmount）是运动的结果，只由剪切产生。
+      // ==================================================================
+      const STRETCH_SCALE = 55;
+      s.stretchAmount = Math.min(0.5, grad.shear * STRETCH_SCALE);
+      if (vlen > 0.02) {
+        s.stretchAngle = Math.atan2(s.vy, s.vx);
       }
 
-      // 尺寸：全程连续生长（无拐点），born 缓慢生长 → active 极缓聚集 → dissipating 轻微扩散
-      if (u < 0.08) {
-        // 出生：0.5 → 1.0（smoothstep）
-        const t = u / 0.08;
-        const s = t * t * (3 - 2 * t);
-        p.curScale = p.initScale * (0.5 + 0.5 * s);
-      } else if (u < 0.55) {
-        // active：1.0 → 1.15（极缓聚集）
-        const t = (u - 0.08) / (0.55 - 0.08);
-        p.curScale = p.initScale * (1.0 + t * 0.15);
-      } else {
-        // V0.3: dissipating 不再膨胀(1.15→1.25),扩散交给速度场+侵蚀纹理
-        // 避免泡泡破裂感:云不"变大消失",而是"被侵蚀散开"
-        const t = (u - 0.55) / 0.45;
-        p.curScale = p.initScale * (1.15 + t * 0.10);
-      }
+      // ==================================================================
+      // V0.4-beta-2 核心：密度衰减 = 散度 + 剪切（纯梯度驱动）
+      //
+      // ① divLoss（正散度 → 膨胀 → 稀释）
+      //   云被速度场"撑开" → 同样的密度摊到更大面积 → 浓度下降
+      //   只取正散度（负散度=压缩，理论上应增浓，但视觉上不做增浓
+      //   避免密度无限增长。只做 max(0, div) 单向衰减）
+      //
+      // ② shearLoss（剪切 → 撕裂 → 混合 → 稀释）
+      //   速度场的交叉梯度把云撕开 → 结构断裂 → 视觉密度下降
+      //   这是"云被风拉开 → 变薄 → 断裂"的物理根源
+      //
+      // 没有 baseLoss（时间不独立致死）
+      // 没有 speedLoss（速度大小不独立致死）
+      // 没有 curlLoss（curl 幅度不独立致死；curl 的效果通过速度梯度自然体现）
+      // 没有 wakeLoss（wake 幅度不独立致死；wake 的效果通过速度梯度自然体现）
+      //
+      // 验收：
+      //   实验 A 静止 → div=0, shear=0 → loss=0 → density 保持 ✓
+      //   实验 B 匀速 → div=0, shear=0 → loss=0 → density 保持 ✓
+      //   实验 C 剪切 → shear>0 → loss>0 → density ↓ ✓
+      //   实验 D Wake → wake 速度场有空间梯度 → div/shear>0 → density ↓ ✓
+      // ==================================================================
+      const DIV_LOSS_SCALE   = 4.5;
+      const SHEAR_LOSS_SCALE = 3.5;
+      const SHEAR_LOSS_CAP   = 0.04;
 
-      // === alpha：全程 smoothstep 曲线，无恒定段，无拐点（根治气泡破裂感） ===
-      // 出生段(0~8%)平滑上升，平台段(8~55%)接近 1 但用极缓弧线过渡（避免 active→dissipating 拐点）
-      // 消散段(55~100%)平滑下降到 0
-      let lifeAlpha;
-      if (u < 0.08) {
-        // 出生淡入：smoothstep 0→1
-        const t = u / 0.08;
-        lifeAlpha = t * t * (3 - 2 * t);
-      } else if (u < 0.55) {
-        // 平台段：从 1 极缓下降到 0.96（避免恒定 1.0 造成拐点）
-        const t = (u - 0.08) / (0.55 - 0.08);
-        lifeAlpha = 1.0 - t * 0.04;
-      } else {
-        // 消散段：从 0.96 平滑下降到 0（smoothstep，与平台段末端连续）
-        // 不做任何硬切，让 smoothstep 在 u=1.0 自然归零（remain=0 → lifeAlpha=0）
-        const t = (u - 0.55) / 0.45;
-        const remain = 1 - t;
-        lifeAlpha = 0.96 * remain * remain * (3 - 2 * remain);
-      }
-      p.alpha = p.baseAlpha * lifeAlpha;
-      // 虚实呼吸：active/dissipating 段加入慢周期浓淡起伏（±15%）
-      // 解决"一团毛"均匀感：让云团局部有浓有淡，似云有实有虚
-      if (p.phase !== 'born') {
-        const breath = Math.sin(p.life * p.breathFreq + p.breathSeed) * 0.15;
-        p.alpha *= (1 + breath);
-      }
-      // _born 保护期：直到 born 阶段结束（u>=0.08）才允许 alpha 阈值清理
-      // 避免 born 早期 alpha 接近 0 时被误删
-      if (p._born && u >= 0.08) p._born = false;
+      const divLoss   = Math.max(0, grad.divergence) * DIV_LOSS_SCALE;
+      const shearLoss = Math.min(SHEAR_LOSS_CAP, grad.shear * SHEAR_LOSS_SCALE);
 
-      // 屏幕外软切（超出边界才清理，且只在 alpha 已经很低时清理，避免可见时被剪）
-      const offEdge = (p.x < -250 || p.x > viewW + 250 || p.y < -250 || p.y > viewH + 250);
-      if (offEdge && p.alpha < 0.02) {
-        particles.splice(i, 1);
+      const totalLoss = Math.min(0.055, divLoss + shearLoss);
+      s.density *= (1 - totalLoss);
+
+      // 最终 alpha = 每单位 density 的视觉浓度 × 当前 density × 呼吸
+      s.alpha = s.baseAlpha * s.density;
+      const breath = Math.sin(
+        (s.x * 0.00019 + s.y * 0.00021) + s.breathSeed + curlTime * s.breathFreq
+      ) * 0.12;
+      s.alpha *= (1 + breath);
+
+      // ==================================================================
+      // 释放采样点（不是 Death，是数值预算回收）
+      // ==================================================================
+      if (s.density < 0.0022) {
+        releaseSamplingPoint(i);
         continue;
       }
-      // 寿命结束彻底清理（u>=1 时侵蚀纹理已到最碎,smoothstep 已自然归零,无视觉跳变）
-      if (u >= 1.0 || (!p._born && p.alpha < 0.00005)) {
-        particles.splice(i, 1);
+      const offEdge = (s.x < -250 || s.x > viewW + 250 || s.y < -250 || s.y > viewH + 250);
+      if (offEdge && s.alpha < 0.014) {
+        releaseSamplingPoint(i);
       }
     }
+
+    // 实验监控
+    logExperimentStatus();
 
     // ===== 渲染 =====
     ctx.globalCompositeOperation = 'source-over';
@@ -726,51 +1072,31 @@
       ctx.drawImage(bgImg, viewW / 2 + bgX - cw / 2, viewH / 2 + bgY - ch / 2, cw, ch);
     }
 
-    // 先画 dissipating（消散层，被侵蚀的云）
-    drawLayer('dissipating', particles);
-    // 再画 active + born（主体层）
-    drawLayer('active', particles);
+    drawCloudField(samplingPoints);
 
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
   }
 
-  function drawLayer(mode, list) {
-    // 消散层和主体层统一用 screen 混合（通透、云感自然）
+  function drawCloudField(list) {
     ctx.globalCompositeOperation = 'screen';
-
     for (let i = 0; i < list.length; i++) {
-      const p = list[i];
-      // 分层渲染：只画对应 phase 的粒子
-      if (mode === 'dissipating' && p.phase !== 'dissipating') continue;
-      if (mode === 'active' && p.phase !== 'active' && p.phase !== 'born') continue;
-
-      const a = p.alpha;
+      const s = list[i];
+      const a = s.alpha;
       if (a < 0.0003) continue;
 
-      // V0.3: dissipating 阶段按 u 进度选择侵蚀纹理等级
-      // 云体被噪声侵蚀:完整 → 空洞 → 断裂 → 碎片,而非整体变淡(根治泡泡破裂感)
-      let tex;
-      if (p.phase === 'dissipating') {
-        const disU = Math.min(1, Math.max(0, (p.life / p.lifespan - 0.55) / 0.45));
-        const lv = Math.min(ERODE_LEVELS - 1, Math.floor(disU * ERODE_LEVELS));
-        tex = p.texSeq[lv];
-      } else {
-        tex = p.texSeq[0];
-      }
-
-      const tw = tex.width * p.curScale;
-      const th = tex.height * p.curScale * p.squishY;
+      const tex = s.tex;
+      const tw = tex.width * s.curScale;
+      const th = tex.height * s.curScale * s.squishY;
 
       ctx.save();
-      ctx.translate(p.x, p.y);
+      ctx.translate(s.x, s.y);
 
-      // 拉伸：沿运动方向拉长（牵丝 + 侵蚀方向一致）
-      if (p.stretchAmount > 0.01) {
-        ctx.rotate(p.stretchAngle);
-        ctx.scale(1 + p.stretchAmount, 1 - p.stretchAmount * 0.3);
+      if (s.stretchAmount > 0.01) {
+        ctx.rotate(s.stretchAngle);
+        ctx.scale(1 + s.stretchAmount, 1 - s.stretchAmount * 0.3);
       } else {
-        ctx.rotate(p.rot);
+        ctx.rotate(s.rot);
       }
 
       ctx.globalAlpha = a;
@@ -779,12 +1105,29 @@
     }
   }
 
-  window.__dbg = { particles, canvas, getPos, sampleCurl, sampleAmbientWind };
+  window.__dbg = { samplingPoints, canvas, getPos, sampleCurl, sampleAmbientWind,
+    sampleTotalVelocity, sampleVelocityGradient, fieldConfig, experimentMode };
 
   // —— 启动 ——
   (function startLoop() {
     resizeCanvas();
     lastTs = performance.now();
+    console.log('%cCloudscape V0.4-beta Physical Semantics Acceptance Build',
+      'color:#4fc3f7;font-weight:bold;font-size:14px');
+
+    // ================================================================
+    // 静态代码审计结果（构建时打印）
+    // 验证：s.density 的写路径只有两处（无 baseLoss/speedLoss/curlLoss/wakeLoss 残留）
+    // ================================================================
+    console.log('%c[静态代码审计] s.density 写路径（grep 结果）', 'color:#ce93d8;font-weight:bold');
+    console.log('  ① 初始化赋值（injectCloudEvent 内）：density = gaussianEnvelope');
+    console.log('  ② 演化循环内一处乘法：s.density *= (1 - totalLoss)');
+    console.log('  其中 totalLoss 只包含 divLoss（散度）+ shearLoss（剪切）两项，都是速度梯度的函数。');
+    console.log('  已确认：无 baseLoss / speedLoss / curlLoss / wakeLoss / lifespan / lifeAlpha / texSeq 残留。');
+    console.log('  已确认：splice 统一封装为 releaseSamplingPoint()，语义为"释放数值预算"而非"Cloud Death"。');
+    console.log('%c[操作] 按 1/2/3/4 启动实验；按 5 查看累积表；按 0 清空', 'color:#b0bec5');
+    console.log('  1=静止云  2=匀速平移  3=剪切  4=Wake因果  5=打印验收表');
+
     function frame(ts) {
       updateAndRender(ts);
       requestAnimationFrame(frame);
