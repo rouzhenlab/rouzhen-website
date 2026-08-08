@@ -2,14 +2,20 @@
   'use strict';
 
   // ==================================================================
-  // V0.3 Calm Cloud
+  // V0.4 Calm Cloud
   //
   // 调整目标：
   //   1) 不要 30% 湿痕残留固化 → 完整消散
-  //   2) 消失时长延长一倍 → 生命周期 16-28s，alpha 曲线柔和
+  //   2) 消失时长延长一倍再减半 → 生命周期 32-56s，alpha smoothstep 柔和
   //   3) 不要羽绒飞溅、不要突然抖动 → curl 降幅度 + 高阻尼 + 低速度上限
   //   4) 手指点哪里就在哪里生成 → 小 spread，跟随手指速度
   //   5) 按住移动 → 粒子跟随手指缓慢移动
+  //   6) 消除突然消失（抖动真因）：
+  //      - alpha 阈值 0.0035 → 0.0006（接近不可见才剪）
+  //      - MAX_PARTICLES 满了拒绝新增（不 shift）
+  //      - 屏幕外软切（只在 alpha 已经很低时清理）
+  //      - 渲染跳过阈值 0.003 → 0.0008
+  //      - alpha 曲线末端用 smoothstep
   // ==================================================================
 
   const canvas = document.getElementById('mainCanvas');
@@ -104,8 +110,8 @@
     const cx = (n1_y - n1_ym) / (2 * eps) - (n2_x - n2_xm) / (2 * eps);
     const cy = -(n1_x - n1_xm) / (2 * eps) - (n2_y - n2_ym) / (2 * eps);
 
-    // curl 幅度大幅降低（120 → 45），消除羽绒飞溅感
-    return { x: cx * 45, y: cy * 45 };
+    // curl 幅度再减半（45 → 22），运动更缓慢
+    return { x: cx * 22, y: cy * 22 };
   }
 
   // ================== 全局风场（极弱，避免抖动） ==================
@@ -114,8 +120,9 @@
   let windTime = 0;
   function sampleAmbientWind(x, y) {
     const t = windTime;
-    const wx = fbm(windNoiseA, x * 0.0012 + t * 0.02, y * 0.0012, 3, 2, 0.5) * 0.025 + 0.004;
-    const wy = fbm(windNoiseB, x * 0.0012, y * 0.0012 + t * 0.015, 3, 2, 0.5) * 0.012;
+    // 环境风再减半，运动极缓慢
+    const wx = fbm(windNoiseA, x * 0.0012 + t * 0.02, y * 0.0012, 3, 2, 0.5) * 0.012 + 0.002;
+    const wy = fbm(windNoiseB, x * 0.0012, y * 0.0012 + t * 0.015, 3, 2, 0.5) * 0.006;
     return { x: wx, y: wy };
   }
 
@@ -261,7 +268,7 @@
   canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
   // ==================================================================
-  // 粒子系统 V0.3：无残留 + 长寿命 + 慢速平稳 + 精准生成
+  // 粒子系统 V0.4：无残留 + 长寿命 + 慢速平稳 + 精准生成 + 无突然消失
   // 生命周期：born(0~8%) → active(8~55%) → dissipating(55~100%) → 完整消散
   // ==================================================================
   const particles = [];
@@ -269,7 +276,8 @@
 
   function spawnParticle(x, y, opts) {
     opts = opts || {};
-    if (particles.length >= MAX_PARTICLES) particles.shift();
+    // 满了拒绝新增（不 shift，避免最老粒子突然消失造成抖动）
+    if (particles.length >= MAX_PARTICLES) return;
 
     const r = Math.random();
     let style, depth;
@@ -295,8 +303,8 @@
 
     const squishY = style === 'wisp' ? 0.60 : style === 'layer' ? 0.82 : 0.95;
 
-    // 生命周期延长一倍：16-28s（均值 ~22s）
-    const lifespan = 16 + Math.random() * 12;
+    // 生命周期再延长一倍：32-56s（均值 ~44s），消失极缓慢
+    const lifespan = 32 + Math.random() * 24;
 
     // 初始速度：继承指针速度（跟随手指），去掉随机发散（减少羽绒飞溅感）
     const initVX = (opts.vx || 0) + (Math.random() - 0.5) * 0.08;
@@ -502,8 +510,8 @@
       let ax = aw.x * windWeight + cl.x * curlWeight * 0.012 + wk.x * 1.8;
       let ay = aw.y * windWeight + cl.y * curlWeight * 0.012 + wk.y * 1.8;
 
-      // 高阻尼：消除抖动，保持缓慢稳定移动
-      const damping = p.phase === 'dissipating' ? 0.978 : (p.phase === 'born' ? 0.92 : 0.96);
+      // 高阻尼（再提高）：消除抖动，运动更缓慢
+      const damping = p.phase === 'dissipating' ? 0.988 : (p.phase === 'born' ? 0.95 : 0.978);
       const dampPerFrame = Math.pow(damping, dtFrames);
 
       p.vx += ax * dtFrames;
@@ -511,8 +519,8 @@
       p.vx *= dampPerFrame;
       p.vy *= dampPerFrame;
 
-      // 低速度上限（3.2）：消除羽绒飞溅和突然抖动
-      const maxV = 3.2;
+      // 低速度上限（3.2 → 1.6）：运动减半
+      const maxV = 1.6;
       const vlen = Math.hypot(p.vx, p.vy);
       if (vlen > maxV) { p.vx = p.vx / vlen * maxV; p.vy = p.vy / vlen * maxV; }
 
@@ -542,26 +550,30 @@
         p.curScale = p.initScale * (1.0 + actU * 0.15);
       }
 
-      // alpha：完整消散曲线（无 30% 残留），曲线柔和
+      // === alpha：完整消散曲线（无残留），smoothstep 末端柔和 ===
       let lifeAlpha;
       if (p.phase === 'born') {
         lifeAlpha = Math.pow(u / 0.08, 1.15);
       } else if (p.phase === 'active') {
         lifeAlpha = 1.0;
       } else {
+        // 缓慢完整消散：1 → 0，smoothstep 让尾部柔和（避免突然消失的抖动感）
         const disU = (u - 0.55) / 0.45;
-        lifeAlpha = Math.pow(1 - disU, 1.35); // 1 → 0 完全消失
+        const t = Math.max(0, 1 - disU);
+        lifeAlpha = t * t * (3 - 2 * t); // smoothstep
       }
       p.alpha = p.baseAlpha * lifeAlpha;
       if (p._born && p.life > 0.05) p._born = false;
 
-      // 屏幕外清理
-      if (p.x < -400 || p.x > viewW + 400 || p.y < -400 || p.y > viewH + 400) {
+      // 屏幕外软切（超出边界才清理，且只在 alpha 已经很低时清理，避免可见时被剪）
+      const offEdge = (p.x < -250 || p.x > viewW + 250 || p.y < -250 || p.y > viewH + 250);
+      if (offEdge && p.alpha < 0.02) {
         particles.splice(i, 1);
         continue;
       }
-      // 寿命结束彻底清理（无残留，born 保护期内不因 alpha 误删）
-      if (u >= 1.0 || (!p._born && p.alpha < 0.0035)) {
+      // 寿命结束彻底清理（u>=1 时 smoothstep 已归零，无视觉跳变）
+      // alpha 阈值降到 0.0006（远低于可见度，避免可见时被剪造成抖动）
+      if (u >= 1.0 || (!p._born && p.alpha < 0.0006)) {
         particles.splice(i, 1);
       }
     }
@@ -594,7 +606,7 @@
       if (mode === 'active' && p.phase !== 'active' && p.phase !== 'born') continue;
 
       const a = p.alpha;
-      if (a < 0.003) continue;
+      if (a < 0.0008) continue; // 阈值降到接近不可见，避免可见粒子被跳过造成抖动
 
       const tw = p.tex.width * p.curScale;
       const th = p.tex.height * p.curScale * p.squishY;
