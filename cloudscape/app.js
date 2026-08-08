@@ -286,7 +286,7 @@
   //   85~100% 湿痕沉积：alpha 冻结 0.3，运动几乎停止，只留极淡底密度
   // ==================================================================
   const particles = [];
-  const MAX_PARTICLES = 1700; // 密度降低 1/3：2600 → 1700
+  const MAX_PARTICLES = 1130; // 浓度再降低 1/3：1700 → 1130
 
   function spawnParticle(x, y, opts) {
     opts = opts || {};
@@ -391,8 +391,8 @@
     pointerVX = 0; pointerVY = 0;
     spawnAccumulator = 0;
     holdTimer = 0;
-    // 点击生成 8-13 个（密度降低 1/3），spread 极小（点哪里在哪里）
-    const burst = 8 + ((Math.random() * 6) | 0);
+    // 点击生成 5-9 个（浓度再降低 1/3），spread 极小（点哪里在哪里）
+    const burst = 5 + ((Math.random() * 5) | 0);
     for (let i = 0; i < burst; i++)
       spawnParticle(pointerX, pointerY, { spread: 18 });
   });
@@ -436,16 +436,16 @@
       }
     }
 
-    // 沿轨迹生成新粒子（密度降低 1/3：STEP 6→9，每步 3-4 个）
+    // 沿轨迹生成新粒子（浓度再降低 1/3：STEP 9→14，每步 2-3 个）
     const densityScale = Math.min(1.1, 0.5 + dist * 0.015);
     spawnAccumulator += dist * densityScale;
-    const STEP = 9; // 步长加大 1/3，密度降低
+    const STEP = 14; // 步长再加大 1/3，浓度再降
     while (spawnAccumulator >= STEP) {
       spawnAccumulator -= STEP;
       const t = 1 - (spawnAccumulator / STEP);
       const ix = lastPX - dx * t;
       const iy = lastPY - dy * t;
-      const n = 3 + ((Math.random() * 2) | 0); // 每步 3-4 个（降低 1/3）
+      const n = 2 + ((Math.random() * 2) | 0); // 每步 2-3 个（再降 1/3）
       for (let i = 0; i < n; i++)
         spawnParticle(ix, iy, {
           vx: pointerVX * 0.045, // 继承手指速度，跟随移动
@@ -504,10 +504,10 @@
 
     if (!isPointerDown) { pointerVX *= 0.9; pointerVY *= 0.9; }
 
-    // 按住不放：持续生成新粒子（密度降低 1/3：0.045s → 0.068s 生成 1 个）
+    // 按住不放：持续生成新粒子（浓度再降低 1/3：0.068s → 0.102s 生成 1 个）
     if (isPointerDown) {
       holdTimer += dt;
-      if (holdTimer > 0.068) { // 每 ~0.068s 生成 1 个（频率降低 1/3）
+      if (holdTimer > 0.102) { // 每 ~0.102s 生成 1 个（频率再降 1/3）
         holdTimer = 0;
         spawnParticle(pointerX, pointerY, { spread: 15, vx: pointerVX * 0.03, vy: pointerVY * 0.03 });
       }
@@ -540,14 +540,8 @@
       let ax = aw.x * windWeight + cl.x * curlWeight * 0.012 + wk.x * 1.8;
       let ay = aw.y * windWeight + cl.y * curlWeight * 0.012 + wk.y * 1.8;
 
-      // 关键修复：静止粒子力衰减（点击不动时云停在原地聚集，不飘走）
-      // 只有 wake 场强（手指滑动过的残影）才让力恢复，保证滑动跟随
-      const curVlen = Math.hypot(p.vx, p.vy);
-      const wakeMag = Math.hypot(wk.x, wk.y);
-      // 静止且无 wake 时，力衰减到 8%（几乎停在原地，只做极弱呼吸）
-      const staticFactor = (curVlen < 0.15 && wakeMag < 0.05) ? 0.08 : 1.0;
-      ax *= staticFactor;
-      ay *= staticFactor;
+      // 取消静止衰减：粒子始终受环境风+curl驱动，自然飘走消散
+      // 解决"云停在原地不动"问题：点击后云会被风场慢慢带走、翻滚、散开，最终消失
 
       // 高阻尼（再提高）：消除抖动，运动更缓慢
       const damping = p.phase === 'dissipating' ? 0.992 : (p.phase === 'born' ? 0.96 : 0.985);
