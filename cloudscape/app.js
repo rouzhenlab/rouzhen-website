@@ -12,7 +12,7 @@
     rebuildWakeGrid();
   }
   window.addEventListener('resize', resizeCanvas);
-  const TARGET_COUNT = 620, MAX_COUNT_HARD = 900, MAX_SCALE_SPAN = 0.27;
+  const TARGET_COUNT = 620, MAX_COUNT_HARD = 1800, MAX_SCALE_SPAN = 0.27;
   const samplingPoints = [];
   function makeInkTexture(seed) {
     const SZ = 256;
@@ -124,7 +124,7 @@
   let interactionMode='cloud';
   function getPos(e){const r=canvas.getBoundingClientRect();let cx,cy;if(e.touches&&e.touches[0]){cx=e.touches[0].clientX;cy=e.touches[0].clientY;}else{cx=e.clientX;cy=e.clientY;}return{x:(cx-r.left)*(canvas.width/dpr)/r.width,y:(cy-r.top)*(canvas.height/dpr)/r.height};}
   function pd(e){e.preventDefault();const p=getPos(e);px=p.x;py=p.y;pvx=pvy=0;down=true;holdT=0;clickWarmup=5;if(expM===4&&stF===-1)stF=globalFrameCounter;if(interactionMode==='cloud')injectCloudEvent(px,py,{count:5});}
-  function pm(e){e.preventDefault();const p=getPos(e);const ox=px,oy=py;px=p.x;py=p.y;const dx=px-ox,dy=py-oy;const maxStep=8;const step=Math.hypot(dx,dy);if(step>maxStep){const k=maxStep/step;pvx=0.6*pvx+0.4*dx*k;pvy=0.6*pvy+0.4*dy*k;}else{pvx=0.6*pvx+0.4*dx;pvy=0.6*pvy+0.4*dy;}if(down){if(expM===4&&stF===-1)stF=globalFrameCounter;const wp=clickWarmup>0?Math.max(0,1-clickWarmup/5):1;if(interactionMode==='cloud'){const spd=Math.hypot(pvx,pvy);if(spd>0.5){injectCloudEvent(px,py,{count:2,spread:20,vx:pvx*0.03,vy:pvy*0.03});}else{injectCloudEvent(px,py,{count:2,spread:20});}}const wa=Math.min(1.2,Math.hypot(pvx,pvy)*0.08)*wp;if(wa>0.04)depositWake(px,py,pvx*0.04,pvy*0.04,wa);}}
+  function pm(e){e.preventDefault();const p=getPos(e);const ox=px,oy=py;px=p.x;py=p.y;const dx=px-ox,dy=py-oy;const maxStep=8;const step=Math.hypot(dx,dy);if(step>maxStep){const k=maxStep/step;pvx=0.6*pvx+0.4*dx*k;pvy=0.6*pvy+0.4*dy*k;}else{pvx=0.6*pvx+0.4*dx;pvy=0.6*pvy+0.4*dy;}if(down){if(expM===4&&stF===-1)stF=globalFrameCounter;const wp=clickWarmup>0?Math.max(0,1-clickWarmup/5):1;const wa=Math.min(1.2,Math.hypot(pvx,pvy)*0.08)*wp;if(wa>0.04)depositWake(px,py,pvx*0.04,pvy*0.04,wa);}}
   function pu(){down=false;}
   canvas.addEventListener('mousedown',pd);window.addEventListener('mousemove',pm);window.addEventListener('mouseup',pu);
   canvas.addEventListener('touchstart',pd,{passive:false});canvas.addEventListener('touchmove',pm,{passive:false});canvas.addEventListener('touchend',pu);
@@ -249,10 +249,6 @@
     stepWake(dF);
     if(!down){pvx*=0.9;pvy*=0.9;}
     if(clickWarmup>0)clickWarmup=Math.max(0,clickWarmup-dF);
-    if(down&&expM===0){
-      holdT+=dt;
-      if(holdT>0.145){holdT=0;const spd=Math.hypot(pvx,pvy);injectCloudEvent(px,py,{count:2+((Math.random()*2)|0),spread:20,scaleBias:0.94,vx:spd>0.5?pvx*0.03:0,vy:spd>0.5?pvy*0.03:0});}
-    }
     for(let i=samplingPoints.length-1;i>=0;i--){
       const s=samplingPoints[i];
       const sf=Math.min(1,Math.max(0,(s.curScale-0.05)/0.22));
@@ -317,7 +313,7 @@
   window.takeScreenshot=takeScreenshot;
   const btnCloud=document.getElementById('modeCloud'),btnDrag=document.getElementById('modeDrag');
   if(btnCloud)btnCloud.addEventListener('click',()=>{interactionMode='cloud';btnCloud.classList.add('active');if(btnDrag)btnDrag.classList.remove('active');});
-  if(btnDrag)btnDrag.addEventListener('click',()=>{interactionMode='drag';btnDrag.classList.add('active');if(btnCloud)btnDrag.classList.remove('active');});
+  if(btnDrag)btnDrag.addEventListener('click',()=>{interactionMode='drag';btnDrag.classList.add('active');if(btnCloud)btnCloud.classList.remove('active');});
   const bgUploader=document.getElementById('bgUploader');
   if(bgUploader)bgUploader.addEventListener('change',(e)=>{const f=e.target.files[0];if(!f)return;const url=URL.createObjectURL(f);const img=new Image();img.onload=()=>{const sc=Math.min(viewW/img.naturalWidth,viewH/img.naturalHeight)*0.92;window._bgSet({url,scale:sc,dx:0,dy:0});};img.src=url;});
   const clearBtn=document.getElementById('clearBtn');
