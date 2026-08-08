@@ -1,20 +1,6 @@
 (() => {
   'use strict';
 
-  // ==================================================================
-  // 剪映云雾借鉴 → 实现要点
-  //  1) 方向性扫掠 + 缓出尾迹  → Wake 风场
-  //  2) 三层视差 (近=快浓/中稳/远=慢薄) → depth ∈ {0.35, 0.7, 1.1}
-  //  3) 混合 = Screen(低alpha, 通透) + Overlay(层次)
-  //  4) alpha 指数渐近饱和 → 永远盖不住背景
-  // 用户4问题:
-  //  A 尺寸大      → baseScale ×0.32, 单云屏占比 <1/10
-  //  B 核爆白光    → 去掉 lighter/sharp 层,  maxPerParticleAlpha=0.135
-  //  C 云消失      → 删除 lifespan, 粒子永生; anchor + 呼吸微摆动, 不漂远
-  //  C' 拖尾滞后   → Wake 场 (网格速度记忆, damping=0.994, 残留2-3s)
-  //  D 按住不遮背  → alpha 渐近饱和 + 每粒子上限
-  // ==================================================================
-
   const canvas = document.getElementById('mainCanvas');
   const ctx = canvas.getContext('2d', { alpha: false });
   let viewW = 0, viewH = 0, dpr = 1;
@@ -189,7 +175,7 @@
     const tx = fx - c0, ty = fy - r0;
     let vx = 0, vy = 0, wsum = 0;
     const cells = [[c0, r0], [c1, r0], [c0, r1], [c1, r1]];
-    const wts = [[(1 - tx) * (1 - ty)], [tx * (1 - ty)], [(1 - tx) * ty], [tx * ty]];
+    const wts = [(1 - tx) * (1 - ty), tx * (1 - ty), (1 - tx) * ty, tx * ty];
     for (let k = 0; k < 4; k++) {
       const [cx, ry] = cells[k], wt = wts[k];
       const idx = ry * wakeCols + cx;
@@ -238,6 +224,8 @@
     const zf = e.deltaY < 0 ? 1.08 : 0.92;
     bgScale = Math.max(0.1, Math.min(10, bgScale * zf));
   }, { passive: false });
+  canvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+  canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
   // ================== 粒子系统（永生 + anchor + 呼吸摆动 + Wake 场位移） ==================
   const particles = [];
@@ -249,7 +237,6 @@
 
     const r = Math.random();
     let style, depth;
-    // 三层深度视差 (剪映 sweep 感)
     if (r < 0.28) { style = 'wisp'; depth = 0.35 + Math.random() * 0.1; }
     else if (r < 0.78) { style = 'layer'; depth = 0.65 + Math.random() * 0.15; }
     else { style = 'puff'; depth = 1.05 + Math.random() * 0.15; }
@@ -258,7 +245,6 @@
 
     const tex = randTexture(style);
 
-    // —— 问题A：云尺寸砍到原来 30–38% ——
     const baseScale = style === 'puff'
       ? (0.15 + Math.random() * 0.18)
       : style === 'layer'
@@ -290,16 +276,21 @@
       rotSpeed: (Math.random() - 0.5) * 0.0018,
       squishY,
       baseAlpha: style === 'puff'
-        ? (depth > 1 ? 0.085 : 0.06)
+        ? (depth > 1 ? 0.18 : 0.13)
         : style === 'layer'
-          ? 0.055
-          : 0.04,
+          ? 0.12
+          : 0.09,
       alpha: 0,
       densityLevel: 0,
     });
   }
 
   // ================== 指针交互 + 加厚（渐近饱和） + Wake 沉积 ==================
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
   let isPointerDown = false;
   let pointerX = -9999, pointerY = -9999;
   let lastPX = -9999, lastPY = -9999;
@@ -308,36 +299,40 @@
   const thickenTargets = new Set();
 
   canvas.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    const pos = getPos(e);
+
     if (interactionMode === 'drag' && bgImg.naturalWidth > 0) {
       isImageDragging = true;
-      imgDragStartX = e.clientX - bgX;
-      imgDragStartY = e.clientY - bgY;
+      imgDragStartX = pos.x - bgX;
+      imgDragStartY = pos.y - bgY;
       return;
     }
     isPointerDown = true;
-    pointerX = e.clientX; pointerY = e.clientY;
+    pointerX = pos.x; pointerY = pos.y;
     lastPX = pointerX; lastPY = pointerY;
     pointerVX = 0; pointerVY = 0;
     spawnAccumulator = 0;
-    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
     const burst = 7 + ((Math.random() * 6) | 0);
     for (let i = 0; i < burst; i++)
       spawnParticle(pointerX, pointerY, { spread: 52 });
   });
 
-  canvas.addEventListener('pointermove', (e) => {
+  window.addEventListener('pointermove', (e) => {
     if (isImageDragging) {
-      bgX = e.clientX - imgDragStartX;
-      bgY = e.clientY - imgDragStartY;
+      const pos = getPos(e);
+      bgX = pos.x - imgDragStartX;
+      bgY = pos.y - imgDragStartY;
       return;
     }
     if (!isPointerDown) return;
-    const dx = e.clientX - lastPX;
-    const dy = e.clientY - lastPY;
+    const pos = getPos(e);
+    const dx = pos.x - lastPX;
+    const dy = pos.y - lastPY;
     const dist = Math.hypot(dx, dy);
     pointerVX = pointerVX * 0.55 + dx * 0.45;
     pointerVY = pointerVY * 0.55 + dy * 0.45;
-    pointerX = e.clientX; pointerY = e.clientY;
+    pointerX = pos.x; pointerY = pos.y;
     lastPX = pointerX; lastPY = pointerY;
 
     if (dist > 0.5) {
@@ -358,15 +353,13 @@
     }
   });
 
-  const releasePointer = (e) => {
+  const releasePointer = () => {
     isPointerDown = false;
     isImageDragging = false;
     spawnAccumulator = 0;
-    try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
   };
-  canvas.addEventListener('pointerup', releasePointer);
-  canvas.addEventListener('pointercancel', releasePointer);
-  canvas.addEventListener('pointerleave', releasePointer);
+  window.addEventListener('pointerup', releasePointer);
+  window.addEventListener('pointercancel', releasePointer);
 
   // ================== 清空 & 截图 ==================
   document.getElementById('clearBtn').addEventListener('click', () => { particles.length = 0; });
@@ -430,7 +423,7 @@
         p.densityLevel *= Math.pow(0.999, dtFrames);
       }
       const densBoost = 1 + p.densityLevel * 1.4;
-      const maxAlphaPerP = Math.min(0.135, p.baseAlpha * 2.3);
+      const maxAlphaPerP = Math.min(0.28, p.baseAlpha * 2.2);
       p.alpha = Math.min(maxAlphaPerP, p.baseAlpha * (0.55 + 0.9 * p.growT) * densBoost);
 
       const offsX = Math.sin(p.phase) * p.breathAmtX + Math.sin(p.phase2 * 1.37) * p.breathAmtX * 0.35;
@@ -477,7 +470,7 @@
     if (mode === 'screen') ctx.globalCompositeOperation = 'screen';
     else ctx.globalCompositeOperation = 'source-over';
 
-    const layerAlpha = mode === 'screen' ? 0.55 : 0.85;
+    const layerAlpha = mode === 'screen' ? 0.75 : 0.95;
 
     for (let i = 0; i < list.length; i++) {
       const p = list[i];
