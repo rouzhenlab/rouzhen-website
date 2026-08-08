@@ -1,4 +1,3 @@
-
 (async () => {
   const app = new PIXI.Application();
   await app.init({
@@ -9,7 +8,12 @@
     autoDensity: true
   });
 
-  document.getElementById('canvas-container').appendChild(app.canvas);
+  const canvasContainer = document.getElementById('canvas-container');
+  canvasContainer.appendChild(app.canvas);
+
+  // 关键修复：彻底禁用手机长按弹出系统菜单（复制、搜索等）
+  window.addEventListener('contextmenu', (e) => e.preventDefault());
+  app.canvas.style.touchAction = 'none';
 
   const bgLayer = new PIXI.Container();
   const cloudLayer = new PIXI.Container();
@@ -94,14 +98,13 @@
     }
   });
 
-  // 3. 升级版云渲染核心：生成具备多尺度纤丝与边缘噪波侵蚀的“类密度场”纹理
+  // 生成具备多尺度纤丝与边缘噪波侵蚀的“类密度场”纹理
   function createVolumetricCloudTexture() {
     const canvas = document.createElement('canvas');
     canvas.width = 200;
     canvas.height = 200;
     const ctx = canvas.getContext('2d');
 
-    // 核心大尺度云体分布
     const grad = ctx.createRadialGradient(100, 100, 5, 100, 100, 95);
     grad.addColorStop(0, 'rgba(240, 245, 242, 0.55)');
     grad.addColorStop(0.35, 'rgba(215, 228, 222, 0.25)');
@@ -110,7 +113,6 @@
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 200, 200);
 
-    // 中/高尺度微团与云丝交织，打破单调圆斑
     for (let i = 0; i < 14; i++) {
       const x = 100 + (Math.random() - 0.5) * 90;
       const y = 100 + (Math.random() - 0.5) * 90;
@@ -130,7 +132,7 @@
 
   const cloudTexture = createVolumetricCloudTexture();
 
-  // 4. 持久化云场系统 (Persistent Cloud Fields)
+  // 持久化云场系统
   const cloudFields = [];
   let isPointerDown = false;
   let activeField = null;
@@ -138,7 +140,6 @@
   let lastX = -1000, lastY = -1000;
   let pointerVX = 0, pointerVY = 0;
 
-  // 精准事件拦截：只拦截真正交互的 UI 控件，对 Canvas / 背景 / 容器安全放行
   window.addEventListener('pointerdown', (e) => {
     const uiElement = e.target.closest('button, input, label, select, textarea, a');
     if (uiElement) return;
@@ -158,7 +159,6 @@
     pointerVX = 0;
     pointerVY = 0;
 
-    // 创建连续密度云场
     activeField = createCloudField(e.clientX, e.clientY);
     cloudFields.push(activeField);
   });
@@ -180,7 +180,6 @@
     currentPointerX = e.clientX;
     currentPointerY = e.clientY;
 
-    // 长按住时持续向当前云场注入密度（非线性饱和，绝不爆白）
     if (activeField) {
       activeField.density = Math.min(1.8, activeField.density + 0.025);
     }
@@ -207,7 +206,6 @@
     container.y = y;
 
     const puffs = [];
-    // 增加内部微团密度与错落感，使之呈现真实的体积结构
     const count = 12 + Math.floor(Math.random() * 5); 
 
     for (let i = 0; i < count; i++) {
@@ -244,14 +242,12 @@
     };
   }
 
-  // 清空按钮
   document.getElementById('clearBtn').addEventListener('click', () => {
     cloudFields.forEach(f => cloudLayer.removeChild(f.container));
     cloudFields.length = 0;
     activeField = null;
   });
 
-  // 截图按钮
   document.getElementById('snapBtn').addEventListener('click', () => {
     const ui = document.querySelector('.ui-overlay');
     ui.style.display = 'none';
@@ -268,7 +264,6 @@
     }, 50);
   });
 
-  // 5. 运动与内部翻滚循环：密度非线性映射 + 整体风场搬运 + 永久存在
   app.ticker.add((ticker) => {
     if (!isPointerDown) {
       pointerVX *= 0.88;
@@ -284,7 +279,6 @@
     for (let i = cloudFields.length - 1; i >= 0; i--) {
       const field = cloudFields[i];
 
-      // 局部风场推动
       const dx = field.container.x - currentPointerX;
       const dy = field.container.y - currentPointerY;
       const distance = Math.hypot(dx, dy);
@@ -300,10 +294,8 @@
       field.container.x += field.vx * dt;
       field.container.y += field.vy * dt;
 
-      // 浓度非线性饱和映射：opacity = 1 - exp(-density) 绝对不会爆白刺眼
       const opacity = 0.85 * (1.0 - Math.exp(-field.density * 1.6));
 
-      // 内部永不停息的 Domain Warping 涡流翻滚
       field.puffs.forEach(p => {
         p.angle += p.speed * dt;
         p.sprite.x = p.baseX + Math.cos(p.angle) * p.radius;
