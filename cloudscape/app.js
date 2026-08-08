@@ -44,15 +44,17 @@
       }
       cx.fill();
     }
-    const d = cx.getImageData(0,0,SZ,SZ); const dd = d.data;
-    for (let i = 0; i < dd.length; i += 4) {
-      const a = dd[i+3]; if (a > 0 && a < 120) {
-        const n = Math.random();
-        if (n < 0.17) dd[i+3] = Math.max(0,a-28);
-        else if (n < 0.28) dd[i+3] = Math.min(255,a+20);
+    try {
+      const d = cx.getImageData(0,0,SZ,SZ); const dd = d.data;
+      for (let i = 0; i < dd.length; i += 4) {
+        const a = dd[i+3]; if (a > 0 && a < 120) {
+          const n = Math.random();
+          if (n < 0.17) dd[i+3] = Math.max(0,a-28);
+          else if (n < 0.28) dd[i+3] = Math.min(255,a+20);
+        }
       }
-    }
-    cx.putImageData(d,0,0);
+      cx.putImageData(d,0,0);
+    } catch(e) {}
     cx.globalCompositeOperation = 'lighter';
     const hl = cx.createRadialGradient(cx0-radius*0.25, cy0-radius*0.35, 0, cx0-radius*0.25, cy0-radius*0.35, radius*0.7);
     hl.addColorStop(0,'rgba(255,255,255,0.13)'); hl.addColorStop(1,'rgba(0,0,0,0)');
@@ -236,10 +238,10 @@
       const s=samplingPoints[i];
       const sf=Math.min(1,Math.max(0,(s.curScale-0.05)/0.22));
       const g=sVG(s.x,s.y,sf,s.depth);
-      const dp=Math.pow(0.985,dF);
+      const dp=Math.pow(0.92,dF);
       s.vx=s.vx*dp+g.vx*dF;
       s.vy=s.vy*dp+g.vy*dF;
-      const mv=0.8,vl=Math.hypot(s.vx,s.vy);
+      const mv=0.3,vl=Math.hypot(s.vx,s.vy);
       if(vl>mv){s.vx=s.vx/vl*mv;s.vy=s.vy/vl*mv;}
       s.x+=s.vx*dF;s.y+=s.vy*dF;
       s.rot+=s.rotSpeed*dF;
