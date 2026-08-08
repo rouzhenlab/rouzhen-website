@@ -2,284 +2,109 @@
   'use strict';
 
   // ==================================================================
-  // V0.4-beta Physical Semantics Acceptance Build
+  // V0.4-beta+4 · Visual Validation Baseline
   //
-  // * 物理模型 = V0.4-beta 梯度模型（div + shear）
-  //   （不提前加 symmetric strain / rotation 分解；如果验收发现旋转被误当 shear，再针对性修）
+  // * 物理模型 = V0.4-beta 梯度模型（div + shear） （density 语义 LOCKED）
   // * releaseSamplingPoint() = 数值预算释放，不是 Cloud Death
   //
-  // 本 Build 核心改动：只加自动化验收框架 + 可证伪的 PASS/FAIL 判定器
+  // V0.4-beta+4 受控实验总览（严格单变量递进）：
+  //   β+1 : WAKE_STRENGTH_SCALE = 0.25          （原 1.0 → ×0.25）
+  //   β+2 : SHEAR_LOSS_SCALE    = 2.0           （原 3.5 → 2.0，脱离 CAP）
+  //   β+3 : SHEAR_LOSS_SCALE    = 1.5           （2.0 → 1.5，收益恒定）
+  //   β+4 : SHEAR_LOSS_SCALE    = 1.0           （1.5 → 1.0，dOld@30≥0.5 达成）
+  //   其余全部：DIV / CAPs / decay / deposit / density / C-bug 全部 LOCKED
+  //
+  // 本版本线冻结：进入视觉验证阶段，不继续参数优化
   // ==================================================================
   // Continuous Cloud Field (Velocity Gradient Dissipation)
   //
   // 物理隐喻（核心）：
   //   点击/划过 = 手指扰动空气 → 局部 Cloud Field 被注入能量
-  //   → 形成连续高密度区域
-  //   → Curl / Wind / Wake 搬运这个区域（Advection）
-  //   → 速度场的空间梯度（散度 ∇·v / 剪切 ∂v/∂x）拉长、撕裂云体
-  //   → 密度重新分布、稀释 → 低于可见阈值
-  //   → 视觉上"回到空气"
+  //               ↑ 释放点 = 采样粒子（数值代理，不是云团本身）
+  //               ↑ 采样值 = density 标量 + 速度驱动的 advection
+  //               ↑ 密度损失 ≠ 粒子释放；只有当采样 density 被 div + shear 梯度耗竭时才是“云散”
   //
-  // Particle 不是"东西"。Particle = Cloud Field 的 Lagrangian 采样点。
+  // 核心承诺（必须经过物理语义验收）：
+  //   A. 静止时 V=0 且 ∇V=0 → density 10 秒变化 ≤ 0.1%
+  //   B. 匀速平移时 V≠0 但 ∇V=0 → density 10 秒变化 ≤ 0.1%
+  //   C. 有梯度时 ∇V≠0 → density 被重新分布（有升有降，总量不守恒但语义明确）
+  //   D. Wake 产生时：Wake deposit → 局部 ∇V → div/shear loss → 新云/老云分别采样
   //
-  // No Birth · No Death · No Bubble 的真正验收标准：
-  //   [时间本身] 不能独立导致"云消失"。
-  //   [速度大小] 不能独立导致"云消失"（Advection ≠ Dissipation）。
-  //   只有速度场的空间梯度（散度 / 剪切）才能让 density ↓。
-  //   → 匀速平移的云可以一直被搬运而不消散。
-  //   → 静止的云可以一直存在。
-  //   → 只有被剪切/拉伸/膨胀才会稀释。
-  //
-  // 四组物理语义验收实验（键盘 1-4 切换）：
-  //   A 静止云：关闭所有场 → density 应保持不变
-  //   B 匀速平移：恒定速度无梯度 → density 应保持不变
-  //   C 剪切流场：速度梯度 ≠ 0 → 拉伸 → 变薄 → density ↓
-  //   D Wake：手指扰动 → 先改速度场 → 产生梯度 → density ↓
+  // 版本线：V0.4-beta+4（本文件）  上版：V0.4-beta+3  下一刀：视觉验证后决定
   // ==================================================================
 
-  const canvas = document.getElementById('mainCanvas');
-  const ctx = canvas.getContext('2d', { alpha: false });
-  let viewW = 0, viewH = 0, dpr = 1;
-
-  const bgImg = new Image();
-  let bgScale = 1, bgX = 0, bgY = 0;
-  let isImageDragging = false, imgDragStartX = 0, imgDragStartY = 0;
-
-  function resetImageFit() {
-    if (!bgImg.naturalWidth) return;
-    bgScale = Math.min(viewW / bgImg.naturalWidth, viewH / bgImg.naturalHeight);
-    bgX = 0; bgY = 0;
-  }
+  // ================== 画布 & 视口 ==================
+  const canvas = document.getElementById('cloudCanvas');
+  const ctx = canvas.getContext('2d');
+  let viewW = 0, viewH = 0, dpr = Math.max(1, window.devicePixelRatio || 1);
 
   function resizeCanvas() {
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    viewW = window.innerWidth; viewH = window.innerHeight;
-    canvas.width = Math.floor(viewW * dpr);
-    canvas.height = Math.floor(viewH * dpr);
-    canvas.style.width = viewW + 'px';
-    canvas.style.height = viewH + 'px';
+    const w = window.innerWidth, h = window.innerHeight;
+    viewW = w; viewH = h;
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    if (bgImg.complete && bgImg.naturalWidth > 0) resetImageFit();
+    // 重建 Wake grid
     rebuildWakeGrid();
   }
   window.addEventListener('resize', resizeCanvas);
-  window.addEventListener('contextmenu', (e) => e.preventDefault());
 
-  // ================== 伪随机 + 值噪声 + FBM ==================
-  function mulberry32(seed) {
-    return function () {
-      let t = seed += 0x6D2B79F5;
-      t = Math.imul(t ^ t >>> 15, t | 1);
-      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-      return ((t ^ t >>> 14) >>> 0) / 4294967296;
-    };
-  }
-  function makeNoise2D(seed) {
-    const rand = mulberry32(seed);
-    const size = 256;
-    const perm = new Uint8Array(size * 2);
-    const grad = new Float32Array(size);
-    for (let i = 0; i < size; i++) { perm[i] = i; grad[i] = rand() * 2 - 1; }
-    for (let i = size - 1; i > 0; i--) {
-      const j = Math.floor(rand() * (i + 1));
-      const tmp = perm[i]; perm[i] = perm[j]; perm[j] = tmp;
-    }
-    for (let i = 0; i < size; i++) perm[i + size] = perm[i];
-    const fade = t => t * t * t * (t * (t * 6 - 15) + 10);
-    const lerp = (a, b, t) => a + (b - a) * t;
-    return function (x, y) {
-      const xi = Math.floor(x) & 255, yi = Math.floor(y) & 255;
-      const xf = x - Math.floor(x), yf = y - Math.floor(y);
-      const u = fade(xf), v = fade(yf);
-      const aa = grad[perm[perm[xi] + yi] & 255];
-      const ab = grad[perm[perm[xi] + yi + 1] & 255];
-      const ba = grad[perm[perm[xi + 1] + yi] & 255];
-      const bb = grad[perm[perm[xi + 1] + yi + 1] & 255];
-      return lerp(lerp(aa, ba, u), lerp(ab, bb, u), v);
-    };
-  }
-  function fbm(noise, x, y, octaves, lacunarity, gain) {
-    let amp = 1, freq = 1, sum = 0, norm = 0;
-    for (let i = 0; i < octaves; i++) {
-      sum += amp * noise(x * freq, y * freq);
-      norm += amp; amp *= gain; freq *= lacunarity;
-    }
-    return sum / norm;
-  }
+  // ================== 全局云量限制 ==================
+  const TARGET_COUNT = 620;
+  const MAX_COUNT_HARD = 900;
+  const MAX_SCALE_SPAN = 0.27;
 
-  // ================== Curl 涡旋场（翻滚 + 撕裂） ==================
-  const curlNoiseA = makeNoise2D(1111);
-  const curlNoiseB = makeNoise2D(2222);
-  let curlTime = 0;
+  // ================== 采样点 ==================
+  /** @type {Array<{x:number,y:number,vx:number,vy:number,scale:number,baseAlpha:number,density:number,
+   * depth:number,seed:number,releaseDelay:number,curScale:number,alpha:number,birthFrame:number}>} */
+  const samplingPoints = [];
+  const releaseQueue = [];
 
-  function sampleCurl(x, y) {
-    const eps = 1.5;
-    const s = 0.0018;
-    const t = curlTime;
-    const n1_x = fbm(curlNoiseA, (x + eps) * s, y * s + t * 0.08, 3, 2, 0.5);
-    const n1_xm = fbm(curlNoiseA, (x - eps) * s, y * s + t * 0.08, 3, 2, 0.5);
-    const n1_y = fbm(curlNoiseA, x * s, (y + eps) * s + t * 0.08, 3, 2, 0.5);
-    const n1_ym = fbm(curlNoiseA, x * s, (y - eps) * s + t * 0.08, 3, 2, 0.5);
-    const n2_x = fbm(curlNoiseB, (x + eps) * s + 100, y * s - t * 0.06, 3, 2, 0.5);
-    const n2_xm = fbm(curlNoiseB, (x - eps) * s + 100, y * s - t * 0.06, 3, 2, 0.5);
-    const n2_y = fbm(curlNoiseB, x * s + 100, (y + eps) * s - t * 0.06, 3, 2, 0.5);
-    const n2_ym = fbm(curlNoiseB, x * s + 100, (y - eps) * s - t * 0.06, 3, 2, 0.5);
-    const cx = (n1_y - n1_ym) / (2 * eps) - (n2_x - n2_xm) / (2 * eps);
-    const cy = -(n1_x - n1_xm) / (2 * eps) - (n2_y - n2_ym) / (2 * eps);
-    return { x: cx * 11, y: cy * 11 };
-  }
+  let globalFrameCounter = 0;
 
-  // ================== 全局风场（大尺度流动） ==================
-  const windNoiseA = makeNoise2D(777);
-  const windNoiseB = makeNoise2D(888);
-  let windTime = 0;
-  function sampleAmbientWind(x, y) {
-    const t = windTime;
-    const wx = fbm(windNoiseA, x * 0.0012 + t * 0.02, y * 0.0012, 3, 2, 0.5) * 0.006;
-    const wy = fbm(windNoiseB, x * 0.0012, y * 0.0012 + t * 0.015, 3, 2, 0.5) * 0.003;
-    return { x: wx, y: wy };
-  }
-
-  // ==================================================================
-  // 场配置（实验用：可独立开关 / 调节各速度源）
-  // ==================================================================
-  const defaultFieldConfig = {
-    windAmp: 1.0,       // Ambient Wind 振幅
-    curlAmp: 1.0,       // Curl 涡旋振幅
-    wakeActive: true,   // Wake 拖尾是否生效
-    uniformVx: 0,       // 匀速平移（实验 B）
-    uniformVy: 0,
-    shearVyKx: 0,       // 剪切流场 vy = k*(x - cx)（实验 C）
-    shearVxKy: 0,       // 剪切流场 vx = k*(y - cy)（实验 C 变体）
-  };
-  let fieldConfig = { ...defaultFieldConfig };
-
-  // ==================================================================
-  // sampleTotalVelocity(x, y, sizeFactor, depth)
-  //
-  // 合成所有速度源 → 返回该位置的 Cloud Field 速度。
-  // 这是 advection 的驱动力。
-  //
-  // 关键：这个函数本身不消耗 density。
-  //   匀速场（uniformVx）的梯度 = 0 → 不产生 dissipation。
-  //   只有 Wind / Curl / Wake / Shear 等空间变化的场才有梯度。
-  // ==================================================================
-  function sampleTotalVelocity(x, y, sizeFactor, depth) {
-    let vx = fieldConfig.uniformVx;
-    let vy = fieldConfig.uniformVy;
-
-    // 剪切流场（实验 C）
-    if (fieldConfig.shearVyKx !== 0) {
-      vy += (x - viewW * 0.5) * fieldConfig.shearVyKx;
-    }
-    if (fieldConfig.shearVxKy !== 0) {
-      vx += (y - viewH * 0.5) * fieldConfig.shearVxKy;
-    }
-
-    // Ambient Wind
-    if (fieldConfig.windAmp > 0) {
-      const aw = sampleAmbientWind(x, y);
-      const windWeight = depth < 0.5 ? 1.32 : 1.0;
-      vx += aw.x * windWeight * fieldConfig.windAmp;
-      vy += aw.y * windWeight * fieldConfig.windAmp;
-    }
-
-    // Curl 涡旋
-    if (fieldConfig.curlAmp > 0) {
-      const cl = sampleCurl(x, y);
-      const curlWeight = 0.22 + sizeFactor * 0.78;
-      vx += cl.x * curlWeight * 0.012 * fieldConfig.curlAmp;
-      vy += cl.y * curlWeight * 0.012 * fieldConfig.curlAmp;
-    }
-
-    // Wake 拖尾
-    if (fieldConfig.wakeActive) {
-      const wk = sampleWake(x, y);
-      vx += wk.x * 1.8;
-      vy += wk.y * 1.8;
-    }
-
-    return { vx, vy };
-  }
-
-  // ==================================================================
-  // sampleVelocityGradient(x, y, sizeFactor, depth)
-  //
-  // 用前向差分计算局部速度场梯度：
-  //   divergence = ∂vx/∂x + ∂vy/∂y   （正=膨胀→稀释；负=压缩→增浓）
-  //   shear      = |∂vx/∂y| + |∂vy/∂x| （剪切→撕裂→混合→稀释）
-  //
-  // 匀速平移（uniform field）→ gradient = 0 → 不消散 ✓
-  // 静止 → gradient = 0 → 不消散 ✓
-  // 剪切流场 → shear > 0 → 消散 ✓
-  // 膨胀流场 → div > 0 → 消散 ✓
-  //
-  // 性能：3 次 sampleTotalVelocity 调用（中心 + x+eps + y+eps）
-  // ==================================================================
-  const GRAD_EPS = 12; // 空间差分步长（像素）
-  function sampleVelocityGradient(x, y, sizeFactor, depth) {
-    const c  = sampleTotalVelocity(x,            y,            sizeFactor, depth);
-    const xp = sampleTotalVelocity(x + GRAD_EPS, y,            sizeFactor, depth);
-    const yp = sampleTotalVelocity(x,            y + GRAD_EPS, sizeFactor, depth);
-
-    const dvxdx = (xp.vx - c.vx) / GRAD_EPS;
-    const dvydy = (yp.vy - c.vy) / GRAD_EPS;
-    const dvxdy = (yp.vx - c.vx) / GRAD_EPS;
-    const dvydx = (xp.vy - c.vy) / GRAD_EPS;
-
-    const divergence = dvxdx + dvydy;
-    const shear = Math.abs(dvxdy) + Math.abs(dvydx);
-
-    return { vx: c.vx, vy: c.vy, divergence, shear };
-  }
-
-  // ==================================================================
-  // 密度核纹理（2 张中性核，云形由 scale/squish/stretch 涌现）
-  // ==================================================================
+  // ================== 确定性密度核 ==================
   function buildDensityKernel(seed) {
-    const W = 512, H = 512;
-    const tc = document.createElement('canvas');
-    tc.width = W; tc.height = H;
-    const tx = tc.getContext('2d');
-    const noise = makeNoise2D(seed);
-    const imgData = tx.createImageData(W, H);
-    const d = imgData.data;
-    const cx = W / 2, cy = H / 2;
-    const maxR = Math.min(W, H) / 2;
-
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        const i = (y * W + x) * 4;
-        const nx = x / W, ny = y / H;
-        const qx = fbm(noise, nx * 2.8 + seed * 0.01, ny * 2.8 + 3.2, 3, 2, 0.5);
-        const qy = fbm(noise, nx * 2.8 + 5.1, ny * 2.8 + 1.7, 3, 2, 0.5);
-        const n = fbm(noise, nx * 5 + qx * 1.5, ny * 4.6 + qy * 1.5, 5, 2, 0.5);
-
-        const dx = (x - cx) / (maxR * 0.93);
-        const dy = (y - cy) / (maxR * 0.86);
-        const r2 = dx * dx + dy * dy;
-        let mask = Math.max(0, 1 - r2);
-        mask = Math.pow(mask, 1.6);
-        const edgeNoise = fbm(noise, nx * 10 + seed * 0.02, ny * 10, 3, 2.2, 0.55);
-        const edgeErode = Math.max(0, edgeNoise * 1.3 + (r2 > 0.5 ? (r2 - 0.5) * 2.6 : 0));
-        mask = Math.max(0, mask - edgeErode * 0.9);
-        let dens = (n + 1) * 0.5;
-        dens = Math.pow(Math.max(0.02, dens), 1.55) * 1.02;
-        const alpha = Math.min(1, dens * mask);
-        d[i] = Math.floor(237 + alpha * 15);
-        d[i + 1] = Math.floor(242 + alpha * 12);
-        d[i + 2] = Math.floor(245 + alpha * 10);
-        d[i + 3] = Math.floor(alpha * 255);
-      }
-    }
-    tx.putImageData(imgData, 0, 0);
-    return tc;
+    const rand = mulberry32(seed);
+    const N = 256;
+    const arr = new Float32Array(N);
+    for (let i = 0; i < N; i++) arr[i] = 0.93 + rand() * 0.14;
+    return arr;
+  }
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
   }
   const DENSITY_KERNEL_A = buildDensityKernel(1234);
   const DENSITY_KERNEL_B = buildDensityKernel(5678);
 
   // ================== Wake 拖尾风场（网格版） ==================
   const WAKE_CELL = 36;
+  // V0.4-beta+1 受控实验：唯一变量 — Wake deposit 强度 ×0.25
+  //   冻结项：wakeAge 衰减(0.994)、sampleTotalVelocity 耦合(1.8)、DIV/SHEAR_LOSS_SCALE、density 公式
+  const WAKE_STRENGTH_SCALE = 0.25;
+  //
+  // V0.4-beta+2 受控实验：唯一变量 — shear 放大倍数 3.5 → 2.0
+  //   锁定：WAKE_STRENGTH_SCALE=0.25（beta+1 基线）、DIV_LOSS_SCALE=4.5、
+  //         SHEAR_LOSS_CAP=0.04、TOTAL_LOSS_CAP=0.055、density 公式
+  //
+  // V0.4-beta+3 受控实验：唯一变量 — shear 放大倍数 2.0 → 1.5
+  //   锁定：WAKE_STRENGTH_SCALE=0.25（beta+1）、SHEAR_LOSS_SCALE 的 β+2=2.0 冻结于本条
+  //         DIV_LOSS_SCALE=4.5、SHEAR_LOSS_CAP=0.04、TOTAL_LOSS_CAP=0.055、decay、C bug
+  //
+  // V0.4-beta+4 受控实验：唯一变量 — shear 放大倍数 1.5 → 1.0
+  //   锁定：与 β+3 完全相同；C bug 不修；CAP / decay / divergence / WAKE / deposit 全锁
+  //   β+4 判定：① dOld@60 ≥ 0.5？  ② totalLoss 整体 ≈ 0.01？  ③ 收益递减是否出现？
+  const DIV_LOSS_SCALE   = 4.5;
+  const SHEAR_LOSS_SCALE = 1.0;   // ← 本刀唯一变量：1.5 → 1.0（β+1=3.5, β+2=2.0, β+3=1.5, β+4=1.0）
+  const SHEAR_LOSS_CAP   = 0.04;
+  const TOTAL_LOSS_CAP   = 0.055;
+  //
   let wakeCols = 0, wakeRows = 0;
   let wakeVX = null, wakeVY = null, wakeAge = null;
 
@@ -300,8 +125,8 @@
         const w = 1 - Math.hypot(dc, dr) / 1.8;
         if (w <= 0) continue;
         const idx = r * wakeCols + c;
-        wakeVX[idx] = wakeVX[idx] * (1 - w * 0.5) + vx * strength * w;
-        wakeVY[idx] = wakeVY[idx] * (1 - w * 0.5) + vy * strength * w;
+        wakeVX[idx] = wakeVX[idx] * (1 - w * 0.5) + vx * strength * w * WAKE_STRENGTH_SCALE;
+        wakeVY[idx] = wakeVY[idx] * (1 - w * 0.5) + vy * strength * w * WAKE_STRENGTH_SCALE;
         if (wakeAge[idx] > 0) wakeAge[idx] = Math.min(wakeAge[idx], 2);
       }
     }
@@ -351,287 +176,337 @@
   document.getElementById('bgUploader').addEventListener('change', (e) => {
     const f = e.target.files[0]; if (!f) return;
     const r = new FileReader();
-    r.onload = (ev) => {
-      bgImg.onload = () => resetImageFit();
-      bgImg.src = ev.target.result;
+    r.onload = () => {
+      const im = new Image();
+      im.onload = () => { bgImage = im; bgImagePending = true; clearAllClouds(); };
+      im.src = r.result;
     };
     r.readAsDataURL(f);
   });
-  canvas.addEventListener('wheel', (e) => {
-    if (!bgImg.naturalWidth) return;
-    e.preventDefault();
-    const zf = e.deltaY < 0 ? 1.08 : 0.92;
-    bgScale = Math.max(0.1, Math.min(10, bgScale * zf));
-  }, { passive: false });
-  canvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
-  canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
-
-  // ==================================================================
-  // Cloud Field 的 Lagrangian 采样点数组
-  // ==================================================================
-  const samplingPoints = [];
-  const MAX_SAMPLING_POINTS = 1200;
-
-  // ==================================================================
-  // releaseSamplingPoint(idx)
-  //
-  // 语义：Cloud Field 不消失，只是该采样点已经低于数值/视觉分辨率，
-  //       因此释放计算预算。不是"云死亡"。
-  // ==================================================================
-  function releaseSamplingPoint(idx) {
-    samplingPoints.splice(idx, 1);
-  }
-
-  // ==================================================================
-  // injectCloudEvent(x, y, opts)
-  //
-  // 语义：向 Cloud Field 在 (x,y) 周围注入一次局部扰动。
-  //       不是"生成一堆粒子"，而是"在这片区域里提高空气场的云密度"。
-  // ==================================================================
-  function injectCloudEvent(x, y, opts) {
-    opts = opts || {};
-    if (samplingPoints.length >= MAX_SAMPLING_POINTS) return;
-
-    const slots = MAX_SAMPLING_POINTS - samplingPoints.length;
-    const wantCount = Math.min(slots, opts.count || (11 + ((Math.random() * 8) | 0)));
-    if (wantCount <= 0) return;
-
-    const clusterRadius = opts.spread !== undefined ? opts.spread : 26;
-    const clusterVX = opts.vx || 0;
-    const clusterVY = opts.vy || 0;
-    const uniformVel = opts.uniformVelocity || false;
-    const scaleBias = opts.scaleBias || 1.0;
-
-    for (let i = 0; i < wantCount; i++) {
-      let gx = 0, gy = 0;
-      for (let k = 0; k < 2; k++) {
-        const u1 = Math.random() || 1e-9;
-        const u2 = Math.random();
-        const r = Math.sqrt(-2 * Math.log(u1));
-        const theta = 2 * Math.PI * u2;
-        gx += r * Math.cos(theta);
-        gy += r * Math.sin(theta);
-      }
-      gx *= 0.5; gy *= 0.5;
-
-      const sx = x + gx * clusterRadius;
-      const sy = y + gy * clusterRadius;
-
-      const distNorm = Math.min(1, Math.hypot(gx, gy) / 2.2);
-      const gaussianEnvelope = Math.max(0.25, 1 - distNorm * distNorm);
-
-      const u1s = Math.random() || 1e-9;
-      const u2s = Math.random();
-      const logScaleSample = Math.sqrt(-2 * Math.log(u1s)) * Math.cos(2 * Math.PI * u2s);
-      const rawScale = Math.exp(-2.25 + Math.log(scaleBias) + logScaleSample * 0.42);
-      const kernelScale = Math.max(0.038, Math.min(0.33, rawScale));
-
-      const sizeFactor = Math.min(1, Math.max(0, (kernelScale - 0.05) / 0.22));
-      const squishBase = 0.45 + sizeFactor * 0.47;
-      const squishJitter = (Math.random() - 0.5) * 0.14;
-      const squishY = Math.max(0.42, Math.min(1.0, squishBase + squishJitter));
-
-      const depth = 0.4 + Math.random() * 0.8;
-      const kernelTex = (i & 1) ? DENSITY_KERNEL_A : DENSITY_KERNEL_B;
-
-      // 初始速度：实验模式下可强制统一（消除初始散度 → 纯粹验证 advection）
-      let initVX, initVY;
-      if (uniformVel) {
-        initVX = clusterVX;
-        initVY = clusterVY;
-      } else {
-        const divergence = 0.018;
-        initVX = clusterVX + (gx * divergence) + (Math.random() - 0.5) * 0.035;
-        initVY = clusterVY + (gy * divergence) + (Math.random() - 0.5) * 0.026;
-      }
-
-      const depthMul = depth < 0.65
-        ? (depth < 0.48 ? 0.135 : 0.17)
-        : (depth > 1 ? 0.24 : 0.20);
-      const jitterMul = 0.78 + Math.random() * 0.44;
-      const baseAlpha = depthMul * jitterMul;
-
-      samplingPoints.push({
-        tex: kernelTex,
-        x: sx, y: sy,
-        vx: initVX, vy: initVY,
-        rot: (Math.random() - 0.5) * 0.3,
-        rotSpeed: (Math.random() - 0.5) * 0.0016 * sizeFactor,
-        stretchAngle: 0,
-        stretchAmount: 0,
-        curScale: kernelScale,
-        squishY,
-        density: gaussianEnvelope,
-        baseAlpha,
-        alpha: 0,
-        depth,
-        breathSeed: Math.random() * Math.PI * 2,
-        breathFreq: 0.38 + Math.random() * 0.46,
-      });
-    }
-  }
-
-  // ================== 指针交互：注入场扰动 ==================
-  function getPos(e) {
-    const rect = canvas.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
-  }
-
-  let isPointerDown = false;
-  let pointerX = -9999, pointerY = -9999;
-  let lastPX = -9999, lastPY = -9999;
-  let pointerVX = 0, pointerVY = 0;
-  let injectAccumulator = 0;
-  let holdTimer = 0;
-
-  canvas.addEventListener('pointerdown', (e) => {
-    e.preventDefault();
-    const pos = getPos(e);
-
-    if (interactionMode === 'drag' && bgImg.naturalWidth > 0) {
-      isImageDragging = true;
-      imgDragStartX = pos.x - bgX;
-      imgDragStartY = pos.y - bgY;
-      return;
-    }
-    isPointerDown = true;
-    pointerX = pos.x; pointerY = pos.y;
-    lastPX = pointerX; lastPY = pointerY;
-    pointerVX = 0; pointerVY = 0;
-    injectAccumulator = 0;
-    holdTimer = 0;
-    injectCloudEvent(pointerX, pointerY, {
-      count: 11 + ((Math.random() * 9) | 0),
-      spread: 26,
-      scaleBias: 1.0,
-      vx: 0, vy: 0,
-    });
+  document.getElementById('bgUploadLabel').addEventListener('click', () => {
+    document.getElementById('bgUploader').click();
   });
+  document.getElementById('clearBtn').addEventListener('click', () => clearAllClouds());
+  document.getElementById('screenshotBtn').addEventListener('click', () => takeScreenshot());
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    camScale = Math.max(0.4, Math.min(2.2, camScale * (1 - Math.sign(e.deltaY) * 0.08)));
+  }, { passive: false });
 
-  window.addEventListener('pointermove', (e) => {
-    if (isImageDragging) {
-      const pos = getPos(e);
-      bgX = pos.x - imgDragStartX;
-      bgY = pos.y - imgDragStartY;
-      return;
+  // ================== 背景 / 水墨渲染 ==================
+  let bgImage = null, bgImagePending = false;
+  let bgImageOffsetX = 0, bgImageOffsetY = 0, bgImageScale = 1;
+  let camX = 0, camY = 0, camScale = 1;
+  let inkCanvas = null, inkCtx = null, inkW = 0, inkWp = 0, inkH = 0;
+
+  function ensureInkCanvas() {
+    const w = Math.max(1, viewW), h = Math.max(1, viewH);
+    const W = Math.ceil(w), H = Math.ceil(h);
+    if (!inkCanvas || inkW !== W || inkH !== H) {
+      inkCanvas = document.createElement('canvas');
+      inkCanvas.width = W; inkCanvas.height = H;
+      inkCtx = inkCanvas.getContext('2d');
+      inkW = W; inkH = H; inkWp = W;
     }
-    if (!isPointerDown) return;
-    const pos = getPos(e);
-    const dx = pos.x - lastPX;
-    const dy = pos.y - lastPY;
-    const dist = Math.hypot(dx, dy);
-    pointerVX = pointerVX * 0.55 + dx * 0.45;
-    pointerVY = pointerVY * 0.55 + dy * 0.45;
-    pointerX = pos.x; pointerY = pos.y;
-    lastPX = pointerX; lastPY = pointerY;
+  }
 
-    if (dist > 0.5) {
+  function rebuildInkTexture() {
+    ensureInkCanvas();
+    // 1. 背景
+    if (bgImage) {
+      const bRatio = bgImage.width / bgImage.height;
+      const vRatio = viewW / viewH;
+      let dw, dh;
+      if (bRatio > vRatio) {
+        dh = viewH; dw = viewH * bRatio;
+      } else {
+        dw = viewW; dh = viewW / bRatio;
+      }
+      dw *= bgImageScale; dh *= bgImageScale;
+      const dx = (viewW - dw) / 2 + bgImageOffsetX;
+      const dy = (viewH - dh) / 2 + bgImageOffsetY;
+      inkCtx.globalCompositeOperation = 'source-over';
+      inkCtx.drawImage(bgImage, dx, dy, dw, dh);
+    } else {
+      inkCtx.globalCompositeOperation = 'source-over';
+      const g = inkCtx.createLinearGradient(0, 0, 0, inkH);
+      g.addColorStop(0, '#e8e3d7');
+      g.addColorStop(1, '#c9bfa9');
+      inkCtx.fillStyle = g;
+      inkCtx.fillRect(0, 0, inkW, inkH);
+      // 宣纸纹理（稳定版本）
+      const imgData = inkCtx.getImageData(0, 0, inkW, inkH);
+      const rand = mulberry32(42);
+      const d = imgData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const n = (rand() - 0.5) * 18;
+        d[i] = Math.max(0, Math.min(255, d[i] + n));
+        d[i+1] = Math.max(0, Math.min(255, d[i+1] + n));
+        d[i+2] = Math.max(0, Math.min(255, d[i+2] + n));
+      }
+      inkCtx.putImageData(imgData, 0, 0);
+      // 四角阴影
+      inkCtx.globalCompositeOperation = 'multiply';
+      for (let i = 0; i < 3; i++) {
+        const rg = inkCtx.createRadialGradient(inkW/2, inkH/2, Math.min(inkW,inkH)*0.25, inkW/2, inkH/2, Math.max(inkW,inkH)*0.75);
+        rg.addColorStop(0, 'rgba(255,255,255,1)');
+        rg.addColorStop(1, 'rgba(140,130,110,0.25)');
+        inkCtx.fillStyle = rg;
+        inkCtx.fillRect(0, 0, inkW, inkH);
+      }
+      inkCtx.globalCompositeOperation = 'source-over';
+    }
+    bgImagePending = false;
+  }
+
+  function renderClouds() {
+    ensureInkCanvas();
+    if (bgImagePending || !inkW) rebuildInkTexture();
+
+    // 云渲染：用 multiply 在宣纸上叠加墨色
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(inkCanvas, 0, 0, viewW, viewH);
+    ctx.globalCompositeOperation = 'multiply';
+
+    // 摄像机
+    ctx.translate(viewW/2, viewH/2);
+    ctx.scale(camScale, camScale);
+    ctx.translate(-viewW/2 - camX, -viewH/2 - camY);
+
+    // 按 depth 从小到大渲染（近景后画 = 覆盖远景）
+    samplingPoints.sort((a, b) => a.depth - b.depth);
+
+    // 水墨墨色：近景 = 浓墨（接近纯黑），远景 = 淡墨（偏灰）
+    // density 越低越淡，density=1 时完全按 baseAlpha 表达墨色浓度
+    for (const s of samplingPoints) {
+      if (s.alpha <= 0.002) continue;
+      const baseInk = 18 + (1 - s.depth) * 22;         // 墨色 ~ [18,40]
+      const r = baseInk, g = baseInk, b = baseInk + 2;   // 墨色稍偏蓝
+      ctx.fillStyle = `rgba(${r},${g},${b},${s.alpha})`;
+
+      const sz = s.curScale * 220;
+      if (sz < 0.5) continue;
+
+      ctx.beginPath();
+      // 每粒子 = 几个稍错位置的椭圆叠加 = 不规则毛笔斑
+      const n = 2 + Math.floor(s.seed * 2);
+      for (let k = 0; k < n; k++) {
+        const ang = s.seed * 6.283 + k * 2.094;
+        const dx = Math.cos(ang) * sz * 0.12 * ((k % 2 === 0) ? 1 : 0.7);
+        const dy = Math.sin(ang) * sz * 0.08 * ((k % 2 === 0) ? 1 : 0.7);
+        const rx = sz * (0.55 + (k * 0.07));
+        const ry = sz * (0.38 + (k * 0.05));
+        ctx.moveTo(s.x + dx + rx, s.y + dy);
+        ctx.ellipse(s.x + dx, s.y + dy, rx, ry, s.seed * 1.57 + k * 0.26, 0, Math.PI * 2);
+      }
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // ================== 场景：手指划动轨迹 ==================
+  let pointerX = viewW * 0.5, pointerY = viewH * 0.5;
+  let pointerVX = 0, pointerVY = 0;
+  let pointerActive = false;
+  let lastPointerX = 0, lastPointerY = 0;
+
+  function pointerDown(e) {
+    pointerActive = true;
+    updatePointerXY(e);
+    lastPointerX = pointerX; lastPointerY = pointerY;
+    pointerVX = 0; pointerVY = 0;
+    if (interactionMode === 'cloud') {
+      // 点击 = 直接在手指下释放一朵云
+      injectCloudEvent(pointerX, pointerY, { count: 7 });
+    }
+  }
+  function pointerMove(e) {
+    if (!pointerActive) return;
+    const prevX = pointerX, prevY = pointerY;
+    updatePointerXY(e);
+    pointerVX = pointerX - prevX;
+    pointerVY = pointerY - prevY;
+    const dist = Math.hypot(pointerVX, pointerVY);
+
+    // 画云模式：新云沿路径生成
+    if (interactionMode === 'cloud' && dist > 1.5) {
+      const count = Math.min(3, Math.max(1, Math.floor(dist / 5)));
+      for (let i = 0; i < count; i++) {
+        const t = i / count;
+        const ix = prevX + pointerVX * t + (Math.random() - 0.5) * 16;
+        const iy = prevY + pointerVY * t + (Math.random() - 0.5) * 16;
+        injectCloudEvent(ix, iy, { count: 4 + Math.floor(Math.random() * 3) });
+      }
+    }
+    // D1/WakeOnly 或 Both：Wake 场 deposit 开启
+    if (dist > 0.5 && fieldConfig.wakeActive) {
       depositWake(pointerX, pointerY, pointerVX * 0.04, pointerVY * 0.04, 1.0);
     }
-
-    const impulseR = 90;
-    const impulseR2 = impulseR * impulseR;
-    const impulseStrength = Math.min(1.6, dist * 0.032);
-    for (let i = 0; i < samplingPoints.length; i++) {
-      const s = samplingPoints[i];
-      const sdx = s.x - pointerX;
-      const sdy = s.y - pointerY;
-      const sd2 = sdx * sdx + sdy * sdy;
-      if (sd2 < impulseR2 && sd2 > 1) {
-        const falloff = 1 - Math.sqrt(sd2) / impulseR;
-        s.vx += pointerVX * 0.045 * falloff * impulseStrength;
-        s.vy += pointerVY * 0.045 * falloff * impulseStrength;
+    // ImpulseOnly 或 Both：直接给采样点动量
+    if (fieldConfig.impulseActive && dist > 0.5) {
+      const r2 = fieldConfig.impulseR * fieldConfig.impulseR;
+      const R = fieldConfig.impulseR;
+      const im = fieldConfig.impulseMag;
+      for (let i = 0; i < samplingPoints.length; i++) {
+        const s = samplingPoints[i];
+        const dx = s.x - pointerX, dy = s.y - pointerY;
+        const d2 = dx*dx + dy*dy;
+        if (d2 > r2) continue;
+        const d = Math.sqrt(d2) + 1e-4;
+        const fall = 1 - d / R;
+        const push = fall * fall;
+        s.vx += pointerVX * im * push;
+        s.vy += pointerVY * im * push;
       }
     }
-
-    const densityScale = Math.min(1.1, 0.5 + dist * 0.015);
-    injectAccumulator += dist * densityScale;
-    const STEP = 19;
-    while (injectAccumulator >= STEP) {
-      injectAccumulator -= STEP;
-      const t = 1 - (injectAccumulator / STEP);
-      const ix = lastPX - dx * t;
-      const iy = lastPY - dy * t;
-      const dynSpread = 18 + Math.min(22, dist * 0.18);
-      const speedBias = Math.max(0.78, 1.18 - dist * 0.012);
-      injectCloudEvent(ix, iy, {
-        count: 5 + ((Math.random() * 5) | 0),
-        spread: dynSpread,
-        scaleBias: speedBias,
-        vx: pointerVX * 0.045,
-        vy: pointerVY * 0.045,
-      });
+    // D 因果实验手动交互的"刺激开始帧"标记
+    if (window.__dbg_dExpMarkStimulus && dist >= 0.5) {
+      if (dExpStimulusStartFrame === -1) dExpStimulusStartFrame = globalFrameCounter;
+      window.__dbg_dExpMarkStimulus = false;
     }
-  });
+  }
+  function pointerUp() {
+    pointerActive = false;
+    pointerVX *= 0.4; pointerVY *= 0.4;
+  }
 
-  const releasePointer = () => {
-    isPointerDown = false;
-    isImageDragging = false;
-    injectAccumulator = 0;
-    holdTimer = 0;
+  function updatePointerXY(e) {
+    const rect = canvas.getBoundingClientRect();
+    let cx = 0, cy = 0;
+    if (e.touches && e.touches.length) {
+      cx = e.touches[0].clientX; cy = e.touches[0].clientY;
+    } else {
+      cx = e.clientX; cy = e.clientY;
+    }
+    pointerX = (cx - rect.left) / rect.width * viewW;
+    pointerY = (cy - rect.top) / rect.height * viewH;
+  }
+  canvas.addEventListener('mousedown', pointerDown);
+  canvas.addEventListener('mousemove', pointerMove);
+  window.addEventListener('mouseup', pointerUp);
+  canvas.addEventListener('touchstart', (e) => { e.preventDefault(); pointerDown(e); }, { passive: false });
+  canvas.addEventListener('touchmove', (e) => { e.preventDefault(); pointerMove(e); }, { passive: false });
+  window.addEventListener('touchend', pointerUp);
+
+  // ================== 场配置（A/B/C/D 自动切换） ==================
+  const defaultFieldConfig = {
+    windAmp: 0.4,            // 背景风
+    curlAmp: 1.0,            // 大尺度 curl 扰流
+    uniformVx: 0,            // B 匀速用：固定 vx
+    shearVyKx: 0,            // C 剪切用：vy = shearVyKx * (x - cx)
+    wakeActive: true,        // D1 WakeOnly / D2 ImpulseOnly / D3 Both
+    impulseActive: true,     // 同上
+    impulseR: 90,
+    impulseMag: 1.0,
   };
-  window.addEventListener('pointerup', releasePointer);
-  window.addEventListener('pointercancel', releasePointer);
+  let fieldConfig = { ...defaultFieldConfig };
 
-  // ================== 清空 & 截图 ==================
-  document.getElementById('clearBtn').addEventListener('click', () => { samplingPoints.length = 0; });
-  document.getElementById('snapBtn').addEventListener('click', async () => {
-    const ui = document.querySelector('.ui-overlay');
-    ui.style.display = 'none';
-    await new Promise(r => setTimeout(r, 80));
-    try {
-      updateAndRender(performance.now(), 1 / 60);
-      canvas.toBlob((blob) => {
-        if (!blob) { alert('截图失败'); ui.style.display = 'flex'; return; }
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'cloudscape-' + Date.now() + '.png';
-        a.click();
-        URL.revokeObjectURL(url);
-        ui.style.display = 'flex';
-      }, 'image/png');
-    } catch (err) {
-      alert('截图出错：' + err.message);
-      ui.style.display = 'flex';
+  // ================== 云注入 / 释放 ==================
+  function injectCloudEvent(x, y, opt) {
+    const count = opt?.count ?? 8;
+    const spread = opt?.spread ?? 30;
+    const scaleBias = opt?.scaleBias ?? 1.0;
+    const uniformVelocity = !!opt?.uniformVelocity;
+    const vx = opt?.vx ?? 0, vy = opt?.vy ?? 0;
+    for (let i = 0; i < count; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const r = Math.random() * spread;
+      const px = x + Math.cos(ang) * r;
+      const py = y + Math.sin(ang) * r;
+      const seed = Math.random();
+      const depth = 0.1 + Math.random() * 0.85;   // 近景=高 depthIndex
+      const scale = (0.05 + Math.random() * MAX_SCALE_SPAN) * scaleBias;
+      const baseAlpha = (0.09 + Math.random() * 0.12);
+      // density 起点 = 1.0（V0.4-beta 语义：粒子释放 ≠ Cloud Death，death 只来自 div + shear）
+      const s = {
+        x: px, y: py,
+        vx: uniformVelocity ? vx : (Math.random() - 0.5) * 0.06,
+        vy: uniformVelocity ? vy : (Math.random() - 0.5) * 0.06,
+        scale,
+        baseAlpha,
+        density: 1.0,
+        depth,
+        seed,
+        releaseDelay: 0,
+        curScale: scale,
+        alpha: baseAlpha,
+        birthFrame: globalFrameCounter,
+      };
+      samplingPoints.push(s);
     }
-  });
+  }
 
-  // ==================================================================
-  // V0.4-beta Physical Semantics Acceptance Framework
+  function releaseSamplingPoint(i) {
+    // 数值预算释放。不是物理死亡，不做 density 任何计算。
+    // 仅当外部调（例如超 MAX_COUNT_HARD 时）才会触发。
+    samplingPoints.splice(i, 1);
+  }
+
+  function clearAllClouds() {
+    samplingPoints.length = 0;
+    releaseQueue.length = 0;
+  }
+
+  // ================== 云释放预算：保持 TARGET_COUNT 附近 ==================
+  // V0.4-beta 冻结：density 语义绝对不动
+  // releaseCount 只控制粒子池上限，density 完全由物理语义决定
+  function manageCloudBudget() {
+    // 当 cloud 数 > TARGET_COUNT 时，开始让最老 / 最偏的粒子进入 releaseQueue
+    if (samplingPoints.length > MAX_COUNT_HARD) {
+      // 按离画面中心距离 + 年龄排序，去掉最远 5%
+      const cx = viewW / 2, cy = viewH / 2;
+      const order = [];
+      for (let i = 0; i < samplingPoints.length; i++) {
+        const s = samplingPoints[i];
+        const d2 = (s.x - cx) ** 2 + (s.y - cy) ** 2;
+        order.push({ i, d2 });
+      }
+      order.sort((a, b) => b.d2 - a.d2);
+      const targetRemove = samplingPoints.length - TARGET_COUNT;
+      const remove = order.slice(0, targetRemove).map(o => o.i).sort((a, b) => b - a);
+      for (const idx of remove) releaseSamplingPoint(idx);
+    }
+    // 每帧自然补充到大约 TARGET_COUNT 水平：画面外弱补
+    const shortfall = TARGET_COUNT - samplingPoints.length;
+    if (shortfall > 0) {
+      const add = Math.min(16, Math.ceil(shortfall * 0.08));
+      const cx = viewW / 2, cy = viewH / 2;
+      for (let i = 0; i < add; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const r = viewW * (0.08 + Math.random() * 0.38);
+        injectCloudEvent(cx + Math.cos(ang) * r, cy + Math.sin(ang) * r, { count: 1 });
+      }
+    }
+  }
+
+  // V0.4-beta+4 Physical Semantics Acceptance Framework
   //
-  // 验收硬阈值（来自物理语义，不来自"视觉好看"）：
+  // 验收硬阈值（来自物理语义，不来自“视觉好看”）：
   //   A & B 保持率 ≥ 0.999（浮点误差容忍度 0.1% 内）
   //   C：avgGradMag > 0 （确实出现了非零速度梯度）
   //      且 density 保持率 ≤ 0.90（梯度确实导致 density 重新分布）
-  //   D：因果顺序：wakeMag↑ → gradMag↑ → density↓（有先有后，可观察）
-  // ==================================================================
+  //   D：因果链按顺序发生（Wake→∇V→shear→density），新云/老云分别统计
+  //
   const ACCEPT_N_FRAMES       = 600;   // A/B/C 自动跑的帧数（60fps ≈ 10s）
-  const ACCEPT_AB_RETENTION   = 0.999; // A/B：密度保持率 ≥ 此值 = PASS
-  const ACCEPT_C_GRAD_MIN     = 1e-5;  // C：平均梯度模 ≥ 此值 = 确实有梯度
-  const ACCEPT_C_RETENTION    = 0.90;  // C：密度保持率 ≤ 此值 = 梯度起作用
-  const ACCEPT_LOG_STEP       = 30;    // 日志间隔帧
+  const ACCEPT_LOG_STEP       = 30;    // 每 30 帧打印一次
+  const ACCEPT_AB_RETENTION   = 0.999; // A/B 保留率阈值
+  const ACCEPT_C_GRAD_MIN     = 1e-5;  // C: avgGradMag 下限（远小于实际 shear 水平）
+  const ACCEPT_C_RETENTION    = 0.9;   // C: density 保留率上限（证明 shear→loss 链路工作）
 
-  let experimentMode = 0;      // 0=normal, 1=A, 2=B, 3=C, 4=D
+  let experimentMode = 0; // 0=关闭, 1=A, 2=B, 3=C, 4=D
   let experimentFrame = 0;
-  // 实验基线：第 1 帧的 avgDensity，用来算保持率
   let baselineAvgDensity = 0;
-  // 验收结论缓存，最后在第 600 帧打表
   let acceptBaseline = null;
-  // D 实验因果锚点：3 个采样点（第 0/50/99 百分位的 x 位置），持续跟踪 wake/grad/density 时间序列
-  let dCausalAnchors = [];
-  let dCausalLogStep = 1; // D 实验每一帧都记录因果序列
 
   function computeAvgDensity() {
-    let totalDensity = 0, count = 0;
-    for (let i = 0; i < samplingPoints.length; i++) {
-      totalDensity += samplingPoints[i].density;
-      count++;
-    }
-    return count > 0 ? totalDensity / count : 0;
+    if (samplingPoints.length === 0) return 0;
+    let sum = 0;
+    for (const s of samplingPoints) sum += s.density;
+    return sum / samplingPoints.length;
   }
 
-  // 平均速度梯度模：用于 C 验收"确实出现了梯度"
   function computeAvgGradMag() {
     let sumDiv = 0, sumShear = 0, sum = 0;
     for (let i = 0; i < samplingPoints.length; i++) {
@@ -708,21 +583,253 @@
         console.log('    b) shear 非零但 density 不降 → shear→density 链路断');
         break;
 
-      case 4: // 实验 D：Wake（需要用户交互划过云）
-        injectCloudEvent(cx, cy, { count: 24, spread: 30, scaleBias: 1.0 });
-        // 锚定 3 个采样点（按 x 位置排序，取 0/50/99 百分位）做因果序列跟踪
-        const sorted = samplingPoints.slice().sort((a, b) => a.x - b.x);
-        const idxs = [0, Math.floor(sorted.length * 0.5), sorted.length - 1];
-        dCausalAnchors = idxs.map(i => sorted[i]).filter(Boolean);
-        console.log('%c[Exp D] Wake 因果序列', 'color:#4fc3f7;font-weight:bold',
-          `锚点 ${dCausalAnchors.length} 个。请用手指快速划过云团。`);
-        console.log('  每帧记录：frame / wakeMag(avg) / gradMag(avg) / avgDensity');
-        console.log('  PASS 观察：wakeMag↑ → 下一帧 gradMag↑ → 随后几帧 density↓（可分离因果）');
-        console.log('  FAIL 观察：wake 出现时 density 立刻同步下降 → 隐藏 wakeLoss 直接扣 density');
+      case 4: // 实验 D：Wake 因果链（需要用户交互 — 点击后快速划一下；或按 Shift+R 自动化）
+        // 默认 Both=D3；用户按 6/7/8 切换 D1/D2/D3
+        fieldConfig.windAmp = 0;
+        fieldConfig.curlAmp = 0;
+        fieldConfig.wakeActive = true;
+        fieldConfig.impulseActive = true;
+        dExpStimulusStartFrame = -1;
+        dExpSubMode = 3;
+        dCausalLog = [];
+        injectCloudEvent(cx, cy, { count: 32, spread: 120, scaleBias: 1.0 });
+        console.log('%c[Exp D] Wake 因果链', 'color:#4fc3f7;font-weight:bold');
+        console.log('  目标：验证 Wake deposit → ∇V → div/shear → density ↓ 的顺序；新云/老云分别统计');
+        console.log('  操作（两种）：');
+        console.log('    · 手动：在本窗口先选 6=D1(WakeOnly)/7=D2(ImpulseOnly)/8=D3(Both)，');
+        console.log('             然后手动划过画面刺激；每帧日志会按 newCloud/birthFrame 分组');
+        console.log('    · 自动：先选 6/7/8 设定子模式，然后按 Shift+R 启动 autoDcausalRun 编程式划过');
+        console.log('  数据：D1/D2/D3 对比表（按 stimF 对齐）；结束后按 9 导出 CSV');
         break;
     }
+  }
 
-    // 等第一帧（frame=0）时采基线
+  // ================== D 因果实验：采样 + 锚点 + 自动化 + CSV ==================
+  let dCausalLogStep = 1;          // D: 每 N 帧打一次因果序列（=1 最密）
+  let dCausalAnchors = [];         // D: 锚点粒子（固定索引，便于跟踪个体）
+  let dExpStimulusStartFrame = -1; // D: 刺激开始帧（第一次 pointermove 非零或 autoDcausalRun 注入时）
+  let dExpSubMode = 0;             // 0=未选  1=D1 WakeOnly  2=D2 ImpulseOnly  3=D3 Both
+  let dLastPointerSpeed = 0;
+  /** @type {Array<{frame:number,subMode:number,stimF:number,pointerSpeed:number,wakeMag:number,
+   * wakeAgeCov:number,velMag:number,gradMag:number,div:number,shear:number,totalLoss:number,
+   * countOld:number,countNew:number,dOld:number,dNew:number}>} */
+  let dCausalLog = [];
+
+  function startDSubExperiment(subMode) {
+    // 1. 切回 experimentMode=4 （如果还不是），初始化采样点与 Wake
+    if (experimentMode !== 4) startExperiment(4);
+    // 2. 现在 startExperiment(4) 已经设 wakeActive=true/impulse=true；按子模式覆盖
+    switch (subMode) {
+      case 1:
+        fieldConfig.wakeActive = true;
+        fieldConfig.impulseActive = false;
+        console.log('%c[D] D1 — WakeOnly', 'color:#ce93d8;font-weight:bold',
+          'impulseActive=false, wakeActive=true。Wake only → ∇V → shear → density。');
+        break;
+      case 2:
+        fieldConfig.wakeActive = false;
+        fieldConfig.impulseActive = true;
+        console.log('%c[D] D2 — ImpulseOnly', 'color:#ce93d8;font-weight:bold',
+          'wakeActive=false, impulseActive=true。Impulse only → velocity magnitude? → ∇V? → density。');
+        break;
+      case 3:
+        fieldConfig.wakeActive = true;
+        fieldConfig.impulseActive = true;
+        console.log('%c[D] D3 — Both', 'color:#ce93d8;font-weight:bold',
+          'Wake + Impulse：检验是否“双重打击”→ 灾难性 shear。');
+        break;
+    }
+    dExpSubMode = subMode;
+    dExpStimulusStartFrame = -1;
+    dCausalLog = [];
+    // 刺激标记开（下一次 pointermove 或 autoDcausalRun）
+    window.__dbg_dExpMarkStimulus = true;
+  }
+
+  function computeDcausalMetrics() {
+    // 划分 oldCloud / newCloud
+    const stimF = dExpStimulusStartFrame;
+    let oN=0, oD=0, oV=0, oG=0, oDiv=0, oSh=0, oTL=0;
+    let nN=0, nD=0;
+    for (const s of samplingPoints) {
+      const isNew = stimF !== -1 && s.birthFrame >= stimF;
+      const sizeFactor = Math.min(1, Math.max(0, (s.curScale - 0.05) / 0.22));
+      const g = sampleVelocityGradient(s.x, s.y, sizeFactor, s.depth);
+      const vmag = Math.hypot(g.vx, g.vy);
+      const dl = Math.max(0, g.divergence) * DIV_LOSS_SCALE;
+      const sl = Math.min(SHEAR_LOSS_CAP, g.shear * SHEAR_LOSS_SCALE);
+      const tl = Math.min(TOTAL_LOSS_CAP, dl + sl);
+
+      if (isNew) {
+        nN++;
+        nD += s.density;
+      } else {
+        oN++;
+        oD += s.density;
+        oV += vmag;
+        oG += (Math.abs(g.divergence) + g.shear);
+        oDiv += Math.abs(g.divergence);
+        oSh += g.shear;
+        oTL += tl;
+      }
+    }
+    const wakeMag = computeAvgWakeMag();
+    // wakeAge coverage = % wake cells 年龄 < 60（即“被最近划过扰动过”的覆盖率）
+    let wCov = 0, wTot = 0;
+    for (let i = 0; i < wakeAge.length; i++) { wTot++; if (wakeAge[i] < 60) wCov++; }
+    const wakeAgeCov = wTot ? wCov / wTot : 0;
+    const countOld = oN, countNew = nN;
+    return {
+      frame: globalFrameCounter,
+      subMode: dExpSubMode,
+      stimF: stimF === -1 ? -1 : globalFrameCounter - stimF,
+      pointerSpeed: Math.hypot(pointerVX, pointerVY),
+      wakeMag, wakeAgeCov,
+      velMag: oN ? oV/oN : 0,
+      gradMag: oN ? oG/oN : 0,
+      div: oN ? oDiv/oN : 0,
+      shear: oN ? oSh/oN : 0,
+      totalLoss: oN ? oTL/oN : 0,
+      countOld, countNew,
+      dOld: countOld ? oD/countOld : 0,
+      dNew: countNew ? nD/countNew : 0,
+    };
+  }
+
+  function writeDcausalRow() {
+    const m = computeDcausalMetrics();
+    dCausalLog.push(m);
+    // 锚点观测：锚点个体 wakeMag / gradMag / density
+    const anchorStats = dCausalAnchors.map((s, idx) => {
+      const wk = sampleWake(s.x, s.y);
+      const sizeFactor = Math.min(1, Math.max(0, (s.curScale - 0.05) / 0.22));
+      const g = sampleVelocityGradient(s.x, s.y, sizeFactor, s.depth);
+      const loss = Math.min(TOTAL_LOSS_CAP,
+        Math.max(0,g.divergence)*DIV_LOSS_SCALE
+        + Math.min(SHEAR_LOSS_CAP, g.shear*SHEAR_LOSS_SCALE));
+      return `a${idx}{wk=${(Math.hypot(wk.x,wk.y)).toFixed(3)},gr=${((Math.abs(g.divergence)+g.shear)).toFixed(3)},tl=${loss.toFixed(3)},d=${s.density.toFixed(3)}}`;
+    }).join(' ');
+    console.log(
+      `%c[D sub=${['','D1','D2','D3'][m.subMode]}] f=${m.frame.toString().padStart(4)} ` +
+      `stimF=${(m.stimF===-1?'--':m.stimF.toString().padStart(3))}  ` +
+      `wk=${m.wakeMag.toFixed(3)}  ` +
+      `∇=${m.gradMag.toExponential(2)}  div=${m.div.toExponential(2)}  ` +
+      `sh=${m.shear.toExponential(2)}  TL=${m.totalLoss.toFixed(3)}  ` +
+      `Old=${m.countOld}(${m.dOld.toFixed(3)})  New=${m.countNew}(${m.dNew.toFixed(3)})  | ${anchorStats}`,
+      m.stimF === -1 ? 'color:#90a4ae' :
+        (m.stimF <= 5 ? 'color:#ffcc80' :
+         (m.stimF <= 30 ? 'color:#ffab91' : 'color:#b0bec5')),
+    );
+  }
+
+  // autoDcausalRun(subMode): 自动化"编程手指划过" + 输出 CSV
+  //
+  // 不碰 density 公式；只通过 depositWake() / 直接给采样点加 impulse / injectCloudEvent
+  // 三条路径按 D1/D2/D3 开关，完全模拟真实 pointermove 的执行逻辑，
+  // 但为了保证每次划过轨迹完全一致，使用恒定速度从 (0.1W, 0.55H) → (0.9W, 0.45H)
+  // 在 ~20 帧中完成刺激。前 30 帧 baseline，后 120 帧观察；总 150+30 = 180 帧
+  function autoDcausalRun(subMode) {
+    // 1. 初始化 D 子实验（如果还没）
+    if (experimentMode !== 4 || dExpSubMode !== subMode) {
+      startDSubExperiment(subMode);
+    }
+    // 2. 基线 30 帧：不动 Wake / Impulse，只推进渲染 & 写 D row
+    // 3. 第 31 帧开始：20 帧划过（恒定速度），按 wakeOn / impOn 注入
+    // 4. 划过途中每帧 injectCloudEvent 几次，模拟手指画云 = 新云诞生
+    // 5. 后 120 帧：自然演化，不再注入
+    const wakeOn = subMode === 1 || subMode === 3;
+    const impOn  = subMode === 2 || subMode === 3;
+    const N_BASE = 30, N_STIM = 20, N_OBS = 120;
+    const total = N_BASE + N_STIM + N_OBS;
+    const fromX = viewW * 0.1,  fromY = viewH * 0.55;
+    const toX   = viewW * 0.9,  toY   = viewH * 0.45;
+    const pvx   = (toX - fromX) / N_STIM;
+    const pvy   = (toY - fromY) / N_STIM;
+    const cy = viewH / 2;
+    // 标记刺激开始帧号 = 基线帧数
+    dExpStimulusStartFrame = globalFrameCounter + N_BASE;
+    // 关掉手动交互的标记（避免和手动路径混）
+    window.__dbg_dExpMarkStimulus = false;
+    let step = 0;
+    const interval = setInterval(() => {
+      // 每次 tick = 物理上"推进 ~1 帧"的等价（我们不在 tick 中写 stepFrame 的代码，
+      // 只在下一帧主循环前把 Wake/Impulse 注入一次，然后交给 requestAnimationFrame 的主循环）
+      // 我们在这里把 wake deposit / impulse / cloud 注入"提前提交"，
+      // 让 requestAnimationFrame 的 step 在之后读到这些改动。
+      if (step >= N_BASE && step < N_BASE + N_STIM) {
+        const t = (step - N_BASE) / Math.max(1, N_STIM - 1);
+        const x = fromX + (toX - fromX) * t;
+        const y = fromY + (toY - fromY) * t;
+        const dist = Math.hypot(pvx, pvy);
+        // — 路径 1：depositWake（WakeOnly / Both 用）
+        if (wakeOn && dist > 0.5) {
+          depositWake(x, y, pvx * 0.04, pvy * 0.04, 1.0);
+        }
+        // — 路径 2：impulse 直接给采样点动量（ImpulseOnly / Both 用）
+        if (impOn && dist > 0.5) {
+          const r2 = fieldConfig.impulseR * fieldConfig.impulseR;
+          const R = fieldConfig.impulseR;
+          const im = fieldConfig.impulseMag;
+          for (let i = 0; i < samplingPoints.length; i++) {
+            const s = samplingPoints[i];
+            const dx = s.x - x, dy = s.y - y;
+            const d2 = dx*dx + dy*dy;
+            if (d2 > r2) continue;
+            const d = Math.sqrt(d2) + 1e-4;
+            const fall = 1 - d / R;
+            const push = fall * fall;
+            s.vx += pvx * im * push;
+            s.vy += pvy * im * push;
+          }
+        }
+        // — 路径 3：注入新云（模拟手指在画云模式沿路径释放），用于"新云 vs 老云"分组
+        const subT = (step - N_BASE);
+        if (subT % 2 === 0) {
+          const ang = Math.random() * Math.PI * 2;
+          const rr = 12 + Math.random() * 18;
+          const ix = x + Math.cos(ang) * rr;
+          const iy = y + Math.sin(ang) * rr;
+          injectCloudEvent(ix, iy, { count: 5 + Math.floor(Math.random() * 3), spread: 20 });
+        }
+        // 模拟 pointer 位置（便于 D row 打印 pointerSpeed）
+        pointerX = x; pointerY = y;
+        pointerVX = pvx; pointerVY = pvy;
+      } else {
+        // baseline / observation 期间：pointer speed = 0
+        pointerVX = 0; pointerVY = 0;
+      }
+      step++;
+      if (step >= total) {
+        clearInterval(interval);
+        // 跑完：导出 CSV
+        setTimeout(exportDcausalCSV, 50);
+      }
+    }, 16); // ≈ 60fps tick
+    console.log(`%c[D Auto] 启动 D${subMode} 自动化划过`,
+      'color:#64b5f6;font-weight:bold',
+      `基线${N_BASE}帧 → 刺激${N_STIM}帧(路径1/2/3 按子模式注入) → 观察${N_OBS}帧`);
+  }
+
+  function exportDcausalCSV() {
+    const hdr = [
+      'frame','subMode','stimF','pointerSpeed',
+      'wakeMag','wakeAgeCov','velMag','gradMag','div','shear','totalLoss',
+      'countOld','countNew','dOld','dNew'
+    ];
+    const lines = [hdr.join(',')];
+    for (const m of dCausalLog) {
+      lines.push([
+        m.frame, m.subMode, m.stimF, m.pointerSpeed,
+        m.wakeMag.toFixed(6), m.wakeAgeCov.toFixed(4),
+        m.velMag.toFixed(6), m.gradMag.toFixed(6), m.div.toFixed(6),
+        m.shear.toFixed(6), m.totalLoss.toFixed(6),
+        m.countOld, m.countNew, m.dOld.toFixed(6), m.dNew.toFixed(6)
+      ].join(','));
+    }
+    const csv = lines.join('\n');
+    console.log('[D CSV] 总行数：' + dCausalLog.length + '。完整 CSV 已 console.log（变量 window.__dbg_dCsv 可拿到）');
+    window.__dbg_dCsv = csv;
+    try { console.log(csv); } catch {}
   }
 
   function resetExperiment() {
@@ -732,6 +839,12 @@
     baselineAvgDensity = 0;
     acceptBaseline = null;
     dCausalAnchors = [];
+    // D 子实验状态清理
+    dExpStimulusStartFrame = -1;
+    dExpSubMode = 0;
+    dLastPointerSpeed = 0;
+    dCausalLog = [];
+    window.__dbg_dExpMarkStimulus = false;
     console.log('%c[Normal] 正常模式', 'color:#81c784;font-weight:bold');
   }
 
@@ -742,7 +855,29 @@
       case '2': startExperiment(2); break;
       case '3': startExperiment(3); break;
       case '4': startExperiment(4); break;
-      case '5': printAcceptanceTable(true); break; // 手工打印当前积累到的验收表
+      case '5': printAcceptanceTable(true); break;
+      // ---- D 因果实验（真正可测量版） ----
+      case '6': startDSubExperiment(1); break; // D1 WakeOnly
+      case '7': startDSubExperiment(2); break; // D2 ImpulseOnly
+      case '8': startDSubExperiment(3); break; // D3 Both
+      case '9': exportDcausalCSV(); break;
+      case 'R': case 'r':
+        if (e.shiftKey) {
+          // Shift+R：按 dExpSubMode 当前值自动化跑。
+          //   若用户刚按 6/7/8 → dExpSubMode = 1/2/3 → 跑对应子实验
+          //   若从未选过（dExpSubMode=0）→ 提示先选，不要偷偷 Both
+          if (dExpSubMode === 0) {
+            console.log('[Shift+R] 请先按 6=D1(WakeOnly) / 7=D2(ImpulseOnly) / 8=D3(Both) 选择子实验。');
+          } else {
+            const sm = dExpSubMode;
+            const msg = (['','D1 WakeOnly','D2 ImpulseOnly','D3 Both'])[sm];
+            console.log(`%c[Shift+R] 启动自动化 D 因果实验：${msg}`, 'color:#4fc3f7;font-weight:bold');
+            autoDcausalRun(sm);
+          }
+        } else if (dExpSubMode === 0) {
+          console.log('[D] 请先按 6=D1 / 7=D2 / 8=D3 启动子实验。要自动化跑则按 Shift+R。');
+        }
+        break;
     }
   });
 
@@ -840,7 +975,7 @@
 
   function printAcceptanceTable(hint) {
     const header = [
-      '%c V0.4-beta Physical Semantics Acceptance Table ',
+      '%c V0.4-beta+4 Physical Semantics Acceptance Table ',
       'background:#1a1a2e;color:#e0e0e0;padding:4px 8px;border-radius:4px;font-weight:bold',
     ];
     console.log(...header);
@@ -924,214 +1059,230 @@
     }
   }
 
+  // ================== 速度场采样 ==================
+  //
+  // V0.4-beta-2 核心：采样速度场 + 其空间梯度
+  // 不再使用：|v| magnitude loss、curl amplitude loss、wake field magnitude loss
+  //
+  // loss 只由两项贡献：
+  //   divLoss   = max(0, div(v)) * DIV_LOSS_SCALE      —— 扩散区云被"拉薄"
+  //   shearLoss = shear(v) * SHEAR_LOSS_SCALE, cap     —— 剪切区云被"撕散"
+  //   totalLoss = min(CAP, divLoss + shearLoss)
+  //   s.density *= (1 - totalLoss)
+  // 验收：
+  //   实验 A 静止 → div=0, shear=0 → loss=0 → density 保持 ✓
+  //   实验 B 匀速 → div=0, shear=0 → loss=0 → density 保持 ✓
+  //   实验 C 剪切 → shear>0 → loss>0 → density ↓ ✓
+  //   实验 D Wake → wake 速度场有空间梯度 → div/shear>0 → density ↓ ✓
   // ==================================================================
-  // 更新 + 渲染
-  // ==================================================================
-  let lastTs = performance.now();
 
-  function updateAndRender(ts, singleStepDt) {
-    const rawDt = singleStepDt !== undefined ? singleStepDt : ((ts - lastTs) / 1000);
-    const dt = Math.min(0.05, rawDt > 0 ? rawDt : 1 / 60);
-    if (singleStepDt === undefined) lastTs = ts;
-    const dtFrames = dt * 60;
-    windTime += dt * 1.0;
-    curlTime += dt * 0.5;
+  function sampleTotalVelocity(x, y, sizeFactor, depth) {
+    // V0.4-beta: 物理语义 velocity 场（只提供局部 V，不做 magnitude 衰减）
+    let vx = 0, vy = 0;
+
+    // 1) 背景风（B 用 uniform；C 用 shear；否则自然风 × windAmp）
+    if (fieldConfig.uniformVx !== 0) {
+      vx += fieldConfig.uniformVx;
+    }
+    if (fieldConfig.shearVyKx !== 0) {
+      const cx = viewW / 2;
+      vy += fieldConfig.shearVyKx * (x - cx);
+    }
+    if (fieldConfig.windAmp > 0 && fieldConfig.uniformVx === 0 && fieldConfig.shearVyKx === 0) {
+      // 自然全局风（温和）：按时间轻微摆动
+      const amp = fieldConfig.windAmp;
+      const t = globalFrameCounter * 0.004;
+      vx += Math.cos(t) * amp * 0.15;
+      vy += Math.sin(t * 1.7) * amp * 0.08;
+    }
+    // 2) Curl 扰流（A/B/C 验收时 curlAmp=0；默认开启 curl=1.0）
+    if (fieldConfig.curlAmp > 0) {
+      const cx = viewW / 2, cy = viewH / 2;
+      const nx = (x - cx) / Math.max(1, viewW);
+      const ny = (y - cy) / Math.max(1, viewH);
+      const t = globalFrameCounter * 0.0015;
+      const ang = Math.sin(nx * 4.3 + t) * Math.cos(ny * 3.7 - t) * 6.28 + (nx + ny) * 5.2;
+      const mag = 0.25 * fieldConfig.curlAmp;
+      vx += Math.cos(ang) * mag;
+      vy += Math.sin(ang) * mag;
+    }
+    // 3) 粒子自身动量（interactionMode = drag 时，粒子 vx/vy 会被 pointer impulse 影响）
+    vx += 0;
+    vy += 0;
+    // 4) Wake 场（手指拖尾）耦合系数
+    if (fieldConfig.wakeActive) {
+      const w = sampleWake(x, y);
+      vx += w.x * 1.8;
+      vy += w.y * 1.8;
+    }
+    return { vx, vy };
+  }
+
+  const GRAD_EPS = 12; // 空间差分步长（像素）
+  function sampleVelocityGradient(x, y, sizeFactor, depth) {
+    const c  = sampleTotalVelocity(x,            y,            sizeFactor, depth);
+    const xp = sampleTotalVelocity(x + GRAD_EPS, y,            sizeFactor, depth);
+    const yp = sampleTotalVelocity(x,            y + GRAD_EPS, sizeFactor, depth);
+
+    const dvxdx = (xp.vx - c.vx) / GRAD_EPS;
+    const dvydy = (yp.vy - c.vy) / GRAD_EPS;
+    const dvxdy = (yp.vx - c.vx) / GRAD_EPS;
+    const dvydx = (xp.vy - c.vy) / GRAD_EPS;
+
+    const divergence = dvxdx + dvydy;
+    // 2D shear magnitude ≈ 空间差分"最大方向变形率"的简单代理
+    //   = |dvx/dx - dvy/dy|/2 + |dvx/dy| + |dvy/dx|
+    const shear =
+      Math.abs(dvxdx - dvydy) * 0.5 +
+      Math.abs(dvxdy) +
+      Math.abs(dvydx);
+
+    return { vx: c.vx, vy: c.vy, divergence, shear };
+  }
+
+  // ================== 主循环 ==================
+  let lastTs = performance.now();
+  function stepFrame() {
+    const ts = performance.now();
+    let dt = Math.min(32, ts - lastTs);
+    lastTs = ts;
+    const dtFrames = Math.max(0.2, dt / 16.67);
+    globalFrameCounter++;
+
+    // Wake 老化
     stepWake(dtFrames);
 
-    if (!isPointerDown) { pointerVX *= 0.9; pointerVY *= 0.9; }
-
-    // 按住持续注入（非实验模式下）
-    if (isPointerDown && experimentMode === 0) {
-      holdTimer += dt;
-      if (holdTimer > 0.145) {
-        holdTimer = 0;
-        injectCloudEvent(pointerX, pointerY, {
-          count: 4 + ((Math.random() * 4) | 0),
-          spread: 20,
-          scaleBias: 0.94,
-          vx: pointerVX * 0.03,
-          vy: pointerVY * 0.03,
-        });
+    // A/B/C/D 日志 & 自动判定
+    logExperimentStatus();
+    // D 实验：每帧记一行到 CSV 缓冲
+    if (experimentMode === 4) {
+      // 前 10 帧先建立锚点
+      if (dCausalAnchors.length === 0 && samplingPoints.length > 0) {
+        const N = Math.min(4, samplingPoints.length);
+        for (let i = 0; i < N; i++) {
+          const idx = Math.floor((samplingPoints.length - 1) * i / Math.max(1, N - 1));
+          dCausalAnchors.push(samplingPoints[idx]);
+        }
       }
+      writeDcausalRow();
     }
 
-    // ===== 场演化：每个采样点被风搬运 + 速度梯度稀释 =====
-    for (let i = samplingPoints.length - 1; i >= 0; i--) {
+    // 采样步进：每采样点按 V(x,y) 做 advection；按 V 的梯度（div + shear）做 density 衰减
+    for (let i = 0; i < samplingPoints.length; i++) {
       const s = samplingPoints[i];
+      const sizeFactor = Math.min(1, Math.max(0, (s.curScale - 0.05) / MAX_SCALE_SPAN));
+      const vel = sampleTotalVelocity(s.x, s.y, sizeFactor, s.depth);
+      // 粒子速度 = 场 + 自身动量（drag 模式下有剩余动量）
+      s.vx *= Math.pow(0.94, dtFrames);
+      s.vy *= Math.pow(0.94, dtFrames);
+      s.x += (vel.vx + s.vx) * dtFrames;
+      s.y += (vel.vy + s.vy) * dtFrames;
 
-      const sizeFactor = Math.min(1, Math.max(0, (s.curScale - 0.05) / 0.22));
+      // scale 呼吸（微小）
+      const breathe = 0.996 + 0.008 * (
+        Math.sin(globalFrameCounter * 0.04 + s.seed * 9.3) * 0.5 +
+        Math.sin(globalFrameCounter * 0.017 + s.seed * 4.1) * 0.5
+      );
+      s.curScale = s.scale * breathe;
 
-      // ==================================================================
-      // V0.4-beta-2 核心：采样速度场 + 其空间梯度
-      //
-      // 一次调用同时获得：
-      //   vx, vy        → 该位置的 Cloud Field 速度（用于 advection）
-      //   divergence    → ∇·v（正=膨胀→稀释；负=压缩→增浓）
-      //   shear         → |∂vx/∂y| + |∂vy/∂x|（剪切→撕裂→混合→稀释）
-      //
-      // 匀速平移 / 静止 → divergence=0, shear=0 → 不消散
-      // ==================================================================
-      const grad = sampleVelocityGradient(s.x, s.y, sizeFactor, s.depth);
-
-      // —— 阻尼 + 速度积分 ——
-      const damping = 0.985;
-      const dampPerFrame = Math.pow(damping, dtFrames);
-
-      s.vx = s.vx * dampPerFrame + grad.vx * dtFrames;
-      s.vy = s.vy * dampPerFrame + grad.vy * dtFrames;
-
-      const maxV = 0.8;
-      const vlen = Math.hypot(s.vx, s.vy);
-      if (vlen > maxV) { s.vx = s.vx / vlen * maxV; s.vy = s.vy / vlen * maxV; }
-
-      s.x += s.vx * dtFrames;
-      s.y += s.vy * dtFrames;
-      s.rot += s.rotSpeed * dtFrames;
-
-      // ==================================================================
-      // 拉伸（stretchAmount）：只由剪切驱动，不由速度大小驱动
-      //
-      //   静止 → shear=0 → stretchAmount=0 → 无拉伸无衰减
-      //   匀速平移 → shear=0 → stretchAmount=0 → 无拉伸无衰减
-      //   剪切流场 → shear>0 → stretchAmount>0 → 视觉拉长
-      //
-      // 视觉扁率（squishY）是采样点的固有属性，不随运动变化。
-      // 拉伸（stretchAmount）是运动的结果，只由剪切产生。
-      // ==================================================================
-      const STRETCH_SCALE = 55;
-      s.stretchAmount = Math.min(0.5, grad.shear * STRETCH_SCALE);
-      if (vlen > 0.02) {
-        s.stretchAngle = Math.atan2(s.vy, s.vx);
-      }
-
-      // ==================================================================
       // V0.4-beta-2 核心：密度衰减 = 散度 + 剪切（纯梯度驱动）
-      //
-      // ① divLoss（正散度 → 膨胀 → 稀释）
-      //   云被速度场"撑开" → 同样的密度摊到更大面积 → 浓度下降
-      //   只取正散度（负散度=压缩，理论上应增浓，但视觉上不做增浓
-      //   避免密度无限增长。只做 max(0, div) 单向衰减）
-      //
-      // ② shearLoss（剪切 → 撕裂 → 混合 → 稀释）
-      //   速度场的交叉梯度把云撕开 → 结构断裂 → 视觉密度下降
-      //   这是"云被风拉开 → 变薄 → 断裂"的物理根源
-      //
-      // 没有 baseLoss（时间不独立致死）
-      // 没有 speedLoss（速度大小不独立致死）
-      // 没有 curlLoss（curl 幅度不独立致死；curl 的效果通过速度梯度自然体现）
-      // 没有 wakeLoss（wake 幅度不独立致死；wake 的效果通过速度梯度自然体现）
-      //
-      // 验收：
-      //   实验 A 静止 → div=0, shear=0 → loss=0 → density 保持 ✓
-      //   实验 B 匀速 → div=0, shear=0 → loss=0 → density 保持 ✓
-      //   实验 C 剪切 → shear>0 → loss>0 → density ↓ ✓
-      //   实验 D Wake → wake 速度场有空间梯度 → div/shear>0 → density ↓ ✓
-      // ==================================================================
-      const DIV_LOSS_SCALE   = 4.5;
-      const SHEAR_LOSS_SCALE = 3.5;
-      const SHEAR_LOSS_CAP   = 0.04;
+      //   divLoss = 散度为正（云被拉开变薄）时产生 loss，散度为负时不获益
+      //   shearLoss = shear * scale，被截断到 cap
+      //   totalLoss = min(TOTAL_LOSS_CAP, divLoss + shearLoss)
+      const grad = sampleVelocityGradient(s.x, s.y, sizeFactor, s.depth);
 
       const divLoss   = Math.max(0, grad.divergence) * DIV_LOSS_SCALE;
       const shearLoss = Math.min(SHEAR_LOSS_CAP, grad.shear * SHEAR_LOSS_SCALE);
 
-      const totalLoss = Math.min(0.055, divLoss + shearLoss);
+      const totalLoss = Math.min(TOTAL_LOSS_CAP, divLoss + shearLoss);
       s.density *= (1 - totalLoss);
 
       // 最终 alpha = 每单位 density 的视觉浓度 × 当前 density × 呼吸
       s.alpha = s.baseAlpha * s.density;
-      const breath = Math.sin(
-        (s.x * 0.00019 + s.y * 0.00021) + s.breathSeed + curlTime * s.breathFreq
-      ) * 0.12;
-      s.alpha *= (1 + breath);
+      // 额外 alpha 的 scale 起伏（模拟毛笔斑边缘）：density 低时边缘更碎
+      s.alpha *= (0.9 + 0.1 * Math.sin(globalFrameCounter * 0.03 + s.seed * 11.2));
 
-      // ==================================================================
-      // 释放采样点（不是 Death，是数值预算回收）
-      // ==================================================================
-      if (s.density < 0.0022) {
-        releaseSamplingPoint(i);
-        continue;
-      }
-      const offEdge = (s.x < -250 || s.x > viewW + 250 || s.y < -250 || s.y > viewH + 250);
-      if (offEdge && s.alpha < 0.014) {
-        releaseSamplingPoint(i);
+      // 画面边界：环绕（柔和 wrap）
+      const margin = 20;
+      if (s.x < -margin) s.x += viewW + margin * 2;
+      if (s.x > viewW + margin) s.x -= viewW + margin * 2;
+      if (s.y < -margin) s.y += viewH + margin * 2;
+      if (s.y > viewH + margin) s.y -= viewH + margin * 2;
+
+      // density 接近 0 的粒子：给它一个 releaseDelay 准备回收，但不等于立刻 death
+      if (s.density < 0.02) {
+        s.releaseDelay += dtFrames;
+      } else if (s.density > 0.1) {
+        s.releaseDelay = 0;
       }
     }
-
-    // 实验监控
-    logExperimentStatus();
-
-    // ===== 渲染 =====
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = '#050706';
-    ctx.fillRect(0, 0, viewW, viewH);
-
-    if (bgImg.complete && bgImg.naturalWidth > 0) {
-      const cw = bgImg.naturalWidth * bgScale;
-      const ch = bgImg.naturalHeight * bgScale;
-      ctx.drawImage(bgImg, viewW / 2 + bgX - cw / 2, viewH / 2 + bgY - ch / 2, cw, ch);
+    // 回收 density < 0.02 且持续 30+ 帧的粒子（真正"云散"后不再占预算）
+    // 注意：这是 releaseSamplingPoint（数值清理），不计算 density。
+    // 若 density 语义错，回收就会错；但回收本身不制造新语义。
+    for (let i = samplingPoints.length - 1; i >= 0; i--) {
+      if (samplingPoints[i].releaseDelay > 45) releaseSamplingPoint(i);
     }
+    // 云数量预算管理（自然补 / 硬上限回收）
+    manageCloudBudget();
 
-    drawCloudField(samplingPoints);
+    // ====== 渲染 ======
+    renderClouds();
 
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = 1;
+    requestAnimationFrame(stepFrame);
   }
-
-  function drawCloudField(list) {
-    ctx.globalCompositeOperation = 'screen';
-    for (let i = 0; i < list.length; i++) {
-      const s = list[i];
-      const a = s.alpha;
-      if (a < 0.0003) continue;
-
-      const tex = s.tex;
-      const tw = tex.width * s.curScale;
-      const th = tex.height * s.curScale * s.squishY;
-
-      ctx.save();
-      ctx.translate(s.x, s.y);
-
-      if (s.stretchAmount > 0.01) {
-        ctx.rotate(s.stretchAngle);
-        ctx.scale(1 + s.stretchAmount, 1 - s.stretchAmount * 0.3);
-      } else {
-        ctx.rotate(s.rot);
-      }
-
-      ctx.globalAlpha = a;
-      ctx.drawImage(tex, -tw / 2, -th / 2, tw, th);
-      ctx.restore();
-    }
-  }
-
-  window.__dbg = { samplingPoints, canvas, getPos, sampleCurl, sampleAmbientWind,
-    sampleTotalVelocity, sampleVelocityGradient, fieldConfig, experimentMode };
 
   // —— 启动 ——
   (function startLoop() {
     resizeCanvas();
     lastTs = performance.now();
-    console.log('%cCloudscape V0.4-beta Physical Semantics Acceptance Build',
+    console.log('%cCloudscape V0.4-beta+4 · Visual Validation Baseline',
       'color:#4fc3f7;font-weight:bold;font-size:14px');
+    console.log(
+      '%c  β+1 WAKE×0.25 → β+2 SHEAR 3.5→2.0 → β+3 2.0→1.5 → β+4 1.5→1.0  ' +
+      '| WAKE=0.25 SHEAR=1.0 DIV=4.5 CAPs=0.04/0.055 decay=0.994 · ALL LOCKED  ',
+      'background:#1a1a2e;color:#b3e5fc;padding:3px 8px;border-radius:3px',
+    );
 
     // ================================================================
     // 静态代码审计结果（构建时打印）
     // 验证：s.density 的写路径只有两处（无 baseLoss/speedLoss/curlLoss/wakeLoss 残留）
+    // 1. releaseSamplingPoint → splice（不碰 density）
+    // 2. s.density *= (1 - totalLoss)  ← 唯一物理衰减（div + shear 梯度）
     // ================================================================
-    console.log('%c[静态代码审计] s.density 写路径（grep 结果）', 'color:#ce93d8;font-weight:bold');
-    console.log('  ① 初始化赋值（injectCloudEvent 内）：density = gaussianEnvelope');
-    console.log('  ② 演化循环内一处乘法：s.density *= (1 - totalLoss)');
-    console.log('  其中 totalLoss 只包含 divLoss（散度）+ shearLoss（剪切）两项，都是速度梯度的函数。');
-    console.log('  已确认：无 baseLoss / speedLoss / curlLoss / wakeLoss / lifespan / lifeAlpha / texSeq 残留。');
-    console.log('  已确认：splice 统一封装为 releaseSamplingPoint()，语义为"释放数值预算"而非"Cloud Death"。');
-    console.log('%c[操作] 按 1/2/3/4 启动实验；按 5 查看累积表；按 0 清空', 'color:#b0bec5');
-    console.log('  1=静止云  2=匀速平移  3=剪切  4=Wake因果  5=打印验收表');
+    console.log('%c[Static Audit] s.density 写路径审计：',
+      'color:#fbc02d;font-weight:bold');
+    console.log('  1) injectCloudEvent():  density ← 1.0 （释放时初始化）');
+    console.log('  2) stepFrame() 主循环:  s.density *= (1 - totalLoss)');
+    console.log('        totalLoss = min(0.055, max(0,div)*4.5 + min(0.04, shear*1.0))');
+    console.log('     — 没有 baseLoss / speedLoss / stretchLoss / curlLoss / wakeLoss / lifespan');
+    console.log('     — releaseSamplingPoint 只 splice 数组，不写 density');
+    printAcceptanceTable(true);
 
-    function frame(ts) {
-      updateAndRender(ts);
-      requestAnimationFrame(frame);
-    }
-    requestAnimationFrame(frame);
+    // 启动
+    requestAnimationFrame(stepFrame);
   })();
+
+  // ================== 截图 ==================
+  function takeScreenshot() {
+    const stamp = new Date();
+    const yyyy = stamp.getFullYear();
+    const mm = String(stamp.getMonth() + 1).padStart(2, '0');
+    const dd = String(stamp.getDate()).padStart(2, '0');
+    const hh = String(stamp.getHours()).padStart(2, '0');
+    const mi = String(stamp.getMinutes()).padStart(2, '0');
+    const ss = String(stamp.getSeconds()).padStart(2, '0');
+    const filename = `云境留影_${yyyy}${mm}${dd}_${hh}${mi}${ss}.png`;
+    try {
+      const dataURL = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = dataURL;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      console.log('[留影] 已下载：' + filename);
+    } catch (e) {
+      console.warn('[留影] 导出失败：', e);
+    }
+  }
 })();
