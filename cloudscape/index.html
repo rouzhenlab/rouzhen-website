@@ -1,1 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Cloudscape / 云境 - ROUZHEN</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://pixijs.download/v8.2.5/pixi.min.js"></script>
+</head>
+<body>
+  <div id="canvas-container"></div>
+  <div class="ui-overlay">
+    <div class="cloud-tools" id="cloudTools">
+      <button class="tool-btn active" data-type="smoke">轻烟</button>
+      <button class="tool-btn" data-type="cloud">团云</button>
+      <button class="tool-btn" data-type="mist">山岚</button>
+      <button class="tool-btn" data-type="sea">云海</button>
+    </div>
+    <div class="action-tools">
+      <label class="tool-btn upload-btn" title="上传盆景">
+        上传
+        <input type="file" id="bgUploader" accept="image/*" hidden>
+      </label>
+      <button class="tool-btn" id="clearBtn" title="清空云气">清空</button>
+      <button class="tool-btn" id="snapBtn" title="留影截图">截图</button>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
 
