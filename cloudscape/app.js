@@ -270,7 +270,7 @@
       const tl=Math.min(TOTAL_LOSS_CAP,dl+sl);
       s.density*=(1-tl);
       const dFade=s.density<0.05?s.density/0.05:1;
-      s.alpha=s.baseAlpha*s.density*dFade*(1+Math.sin((s.x*0.00019+s.y*0.00021)+s.breathSeed+cT*s.breathFreq)*0.12);
+      s.alpha=s.baseAlpha*dFade*(1+Math.sin((s.x*0.00019+s.y*0.00021)+s.breathSeed+cT*s.breathFreq)*0.12);
       if(s.density<0.01){releaseSamplingPoint(i);continue;}
       if((s.x<-250||s.x>viewW+250||s.y<-250||s.y>viewH+250)&&s.alpha<0.014)releaseSamplingPoint(i);
     }
