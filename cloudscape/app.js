@@ -2,19 +2,14 @@
   'use strict';
 
   // ==================================================================
-  // V0.2 Motion Rewrite
+  // V0.3 No Residual · No Anchor · No Death
   //
-  // 核心理念：让云失去锚点。
-  //   云来了 → 云经过 → 云翻滚 → 云散开 → 只留很淡的湿痕 → 下一团再经过
+  // 核心理念：
+  //   不留残 · 不回锚 · 不做死亡粒子
+  //   云来了 → 云经过 → 云翻滚 → 云散了 → 空气恢复原状
   //
-  // 与 V0.1 的根本区别：
-  //   1) 删除 anchorX/Y + spring + maxDrift + densityLevel
-  //      粒子不再问"我该回到哪里"，只问"此刻我受到什么力"
-  //   2) 纯力积分：风 → curl涡旋 → 指针冲量 → 加速度 → 速度 → 位置
-  //   3) curl 噪声涡旋场：粒子同时前进+上升+横向拉伸+局部旋转+卷曲
-  //   4) 生命周期 8-14s：出生淡入 → 稳定翻滚 → 消散拉长 → 留 30% 湿痕底
-  //   5) 30% 不是死粒子残骸，是云场底密度（淡湿痕），新云从上面经过叠加
-  //   6) 指针 = 冲量扰动（不是原地加厚），划过带走已有粒子
+  // 保留：Curl 涡旋 / Ambient Wind / Wake / 侵蚀纹理 / 拉伸 / 生命周期 / 结构破碎消散
+  // 删除：全部 Residual Density Field（不留云的尸体，空气不会脏）
   // ==================================================================
 
   const canvas = document.getElementById('mainCanvas');
@@ -41,7 +36,6 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     if (bgImg.complete && bgImg.naturalWidth > 0) resetImageFit();
     rebuildWakeGrid();
-    rebuildResidual();
   }
   window.addEventListener('resize', resizeCanvas);
   window.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -181,7 +175,7 @@
   }
   // === V0.3 侵蚀纹理序列（多尺度分层） ===
   // 不再让粒子"放大+变透明"消失(泡泡破裂感)
-  // 改为:云体被流场拉薄 → 侵蚀 → 破碎 → 扩散 → 转化为残留场
+  // 改为:云体被流场拉薄 → 侵蚀 → 破碎 → 扩散
   //
   // 侵蚀有方向性和尺度层次(非随机碎片):
   //   lv1: 大尺度低频噪声 → 大块先变薄(云体被风拉开的大结构)
@@ -316,64 +310,6 @@
     }
   }
 
-  // ================== V0.3 Residual Density Field（残留湿度场） ==================
-  // 不是"死粒子尸体",是云场消散后留在空气中的极淡湿度
-  // 新云经过时会叠加,产生时间层次感:第一团云走过留淡痕 → 第二团经过叠加
-  // 属于空间,不属于粒子:无颗粒边缘,无独立运动,缓慢衰减
-  //
-  // 三大约束:
-  //   1) 不太明显:RESIDUAL_MAX_ALPHA 钳制,目标 5-10%
-  //   2) 不跟云跑:deposit 到固定网格位置,粒子移动后 deposit 到新位置,旧位置残留不动
-  //   3) 递减叠加:用 source-over(非 lighter),天然渐近饱和,避免越积越脏
-  let residualCanvas = null, residualCtx = null, resW = 0, resH = 0;
-  const RES_SCALE = 4; // 1/4 分辨率,模糊感正好符合湿度质感
-  const RESIDUAL_MAX_ALPHA = 0.08; // 可调:残留场上限,先控制在 8%
-
-  function rebuildResidual() {
-    resW = Math.max(2, Math.ceil(viewW / RES_SCALE));
-    resH = Math.max(2, Math.ceil(viewH / RES_SCALE));
-    residualCanvas = document.createElement('canvas');
-    residualCanvas.width = resW;
-    residualCanvas.height = resH;
-    residualCtx = residualCanvas.getContext('2d');
-  }
-  // 每帧极缓慢衰减(湿度慢慢消散,约 5-6 秒衰减一半)
-  function decayResidual(dtFrames) {
-    if (!residualCtx) return;
-    residualCtx.globalCompositeOperation = 'destination-out';
-    residualCtx.fillStyle = `rgba(0,0,0,${0.0035 * dtFrames})`;
-    residualCtx.fillRect(0, 0, resW, resH);
-    residualCtx.globalCompositeOperation = 'source-over';
-    residualCtx.globalAlpha = 1;
-  }
-  // 真正的 clamp:逐像素限制 alpha 到 RESIDUAL_MAX_ALPHA
-  // 纠正之前错误:source-over 多次写入会渐近到 1.0,不是 8%
-  // 必须主动 clamp,RESIDUAL_MAX_ALPHA 才是真正的硬上限
-  // 1/4 分辨率下 ~13万像素,每帧一次性能可接受
-  function clampResidual() {
-    if (!residualCtx) return;
-    const img = residualCtx.getImageData(0, 0, resW, resH);
-    const d = img.data;
-    const maxA = Math.floor(RESIDUAL_MAX_ALPHA * 255);
-    for (let i = 3; i < d.length; i += 4) {
-      if (d[i] > maxA) d[i] = maxA;
-    }
-    residualCtx.putImageData(img, 0, 0);
-  }
-  // 粒子末期写入残留:source-over 累积,但由 clampResidual 保证不超上限
-  function depositResidual(p) {
-    if (!residualCtx) return;
-    const rx = p.x / RES_SCALE;
-    const ry = p.y / RES_SCALE;
-    const baseTex = p.texSeq[0];
-    const rs = (baseTex.width * p.curScale) / RES_SCALE * 0.75;
-    // source-over 写入,clampResidual 会保证 alpha 不超 RESIDUAL_MAX_ALPHA
-    residualCtx.globalCompositeOperation = 'source-over';
-    residualCtx.globalAlpha = RESIDUAL_MAX_ALPHA;
-    residualCtx.drawImage(baseTex, rx - rs / 2, ry - rs / 2, rs, rs * p.squishY);
-    residualCtx.globalAlpha = 1;
-  }
-
   // ================== 模式切换 ==================
   let interactionMode = 'cloud';
   const modeCloudBtn = document.getElementById('modeCloud');
@@ -406,16 +342,16 @@
   canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
   // ==================================================================
-  // 粒子系统 V0.2：纯力积分 + curl 翻滚 + 生命周期 + 30% 湿痕
+  // 粒子系统 V0.3：纯力积分 + curl 翻滚 + 生命周期 + 侵蚀结构消散
   //
-  // 粒子不再有 anchor，不再回弹。
-  // 力来源：ambientWind（大尺度流） + curl（涡旋翻滚） + wake（手指残影） + pointerImpulse（直接冲量）
+  // No Residual · No Anchor · No Death
+  //   粒子不再有 anchor，不再回弹，不留残
+  //   力来源：ambientWind（大尺度流） + curl（涡旋翻滚） + wake（手指残影） + pointerImpulse（直接冲量）
   //
   // 生命周期（均值 ~10s）:
-  //   0~12%   出生淡入：alpha 0→1，scale 0.4→1.0
-  //   12~40%  稳定翻滚：alpha=1，curl 主导旋转卷曲
-  //   40~85%  消散拉长：alpha 1→0.3，scale 1.0→1.8（扩散），速度阻尼降低（飘走）
-  //   85~100% 湿痕沉积：alpha 冻结 0.3，运动几乎停止，只留极淡底密度
+  //   0~8%    出生淡入：alpha 0→1，scale 0.5→1.0
+  //   8~55%   稳定翻滚：alpha≈1，curl 主导旋转卷曲
+  //   55~100% 侵蚀消散：结构被拉薄 → 出现空洞 → 断裂成丝 → 淡出
   // ==================================================================
   const particles = [];
   const MAX_PARTICLES = 1130; // 浓度再降低 1/3：1700 → 1130
@@ -633,7 +569,6 @@
     windTime += dt * 1.0;
     curlTime += dt * 0.5;
     stepWake(dtFrames);
-    decayResidual(dtFrames); // V0.3: 残留湿度场缓慢衰减
 
     if (!isPointerDown) { pointerVX *= 0.9; pointerVY *= 0.9; }
 
@@ -767,12 +702,6 @@
       // 避免 born 早期 alpha 接近 0 时被误删
       if (p._born && u >= 0.08) p._born = false;
 
-      // V0.3: dissipating 后期(alpha < 0.08)持续写入残留湿度场
-      // 云被侵蚀散开后,密度写入空间湿度,粒子本身继续消散至删除
-      if (p.phase === 'dissipating' && !p._born && p.alpha < 0.08 && p.alpha > 0.0001) {
-        depositResidual(p);
-      }
-
       // 屏幕外软切（超出边界才清理，且只在 alpha 已经很低时清理，避免可见时被剪）
       const offEdge = (p.x < -250 || p.x > viewW + 250 || p.y < -250 || p.y > viewH + 250);
       if (offEdge && p.alpha < 0.02) {
@@ -785,10 +714,6 @@
       }
     }
 
-    // V0.3: deposit 全部完成后,clamp 残留场到 RESIDUAL_MAX_ALPHA(真正的硬上限)
-    // 纠正 source-over 错误:不 clamp 会渐近到 1.0
-    clampResidual();
-
     // ===== 渲染 =====
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
@@ -799,16 +724,6 @@
       const cw = bgImg.naturalWidth * bgScale;
       const ch = bgImg.naturalHeight * bgScale;
       ctx.drawImage(bgImg, viewW / 2 + bgX - cw / 2, viewH / 2 + bgY - ch / 2, cw, ch);
-    }
-
-    // V0.3: 先画残留湿度场(最底层,在新云之下,是上一团云留下的痕迹)
-    // 无颗粒边缘,是空气湿度而非尸体;新云经过时叠加产生时间层次
-    // canvas 内部已钳制到 RESIDUAL_MAX_ALPHA,渲染不再额外降
-    if (residualCanvas) {
-      ctx.globalCompositeOperation = 'screen';
-      ctx.globalAlpha = 1;
-      ctx.drawImage(residualCanvas, 0, 0, viewW, viewH);
-      ctx.globalAlpha = 1;
     }
 
     // 先画 dissipating（消散层，被侵蚀的云）
@@ -864,7 +779,7 @@
     }
   }
 
-  window.__dbg = { particles, canvas, getPos, sampleCurl, sampleAmbientWind, get residualCanvas(){return residualCanvas;} };
+  window.__dbg = { particles, canvas, getPos, sampleCurl, sampleAmbientWind };
 
   // —— 启动 ——
   (function startLoop() {
