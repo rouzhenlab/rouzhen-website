@@ -286,7 +286,7 @@
   //   85~100% 湿痕沉积：alpha 冻结 0.3，运动几乎停止，只留极淡底密度
   // ==================================================================
   const particles = [];
-  const MAX_PARTICLES = 2600; // 密度再加倍：1300 → 2600
+  const MAX_PARTICLES = 1700; // 密度降低 1/3：2600 → 1700
 
   function spawnParticle(x, y, opts) {
     opts = opts || {};
@@ -295,9 +295,9 @@
 
     const r = Math.random();
     let style, depth;
-    // wisp 40%（更多纤丝飘带）、layer 48%（中景主体）、puff 12%（少团块）
-    if (r < 0.40) { style = 'wisp'; depth = 0.35 + Math.random() * 0.15; }
-    else if (r < 0.88) { style = 'layer'; depth = 0.65 + Math.random() * 0.15; }
+    // wisp 58%（更多纤丝牵丝）、layer 34%（中景主体）、puff 8%（少团块）
+    if (r < 0.58) { style = 'wisp'; depth = 0.35 + Math.random() * 0.15; }
+    else if (r < 0.92) { style = 'layer'; depth = 0.65 + Math.random() * 0.15; }
     else { style = 'puff'; depth = 1.05 + Math.random() * 0.15; }
     style = opts.style || style;
     depth = opts.depth || depth;
@@ -308,21 +308,25 @@
       ? (0.15 + Math.random() * 0.18)
       : style === 'layer'
         ? (0.11 + Math.random() * 0.13)
-        : (0.09 + Math.random() * 0.11);
+        : (0.06 + Math.random() * 0.12); // wisp 更细更扁（牵丝感）
     const initScale = baseScale * (0.8 + depth * 0.4);
 
     const spread = opts.spread !== undefined ? opts.spread : 14;
     const sx = x + (Math.random() - 0.5) * spread;
     const sy = y + (Math.random() - 0.5) * spread;
 
-    const squishY = style === 'wisp' ? 0.60 : style === 'layer' ? 0.82 : 0.95;
+    // wisp 更扁（0.60 → 0.48），强化牵丝形态
+    const squishY = style === 'wisp' ? 0.48 : style === 'layer' ? 0.82 : 0.95;
 
-    // 生命周期再延长一倍：32-56s（均值 ~44s），消失极缓慢
-    const lifespan = 32 + Math.random() * 24;
+    // 消失加快 1/3：32-56s → 22-37s（均值 ~30s）
+    const lifespan = 22 + Math.random() * 15;
 
     // 初始速度：继承指针速度（跟随手指），去掉随机发散（减少羽绒飞溅感）
     const initVX = (opts.vx || 0) + (Math.random() - 0.5) * 0.08;
     const initVY = (opts.vy || 0) + (Math.random() - 0.5) * 0.06;
+
+    // 虚实层次：baseAlpha 随机倍率（0.55-1.25），有些粒子天生淡（虚），有些浓（实）
+    const alphaMul = 0.55 + Math.random() * 0.7;
 
     particles.push({
       tex, style, depth,
@@ -331,7 +335,7 @@
       // 翻滚参数
       rot: (Math.random() - 0.5) * 0.25,
       rotSpeed: (Math.random() - 0.5) * 0.0018 * (style === 'wisp' ? 0.3 : 1),
-      // 拉伸参数：消散期沿运动方向拉长
+      // 拉伸参数：wisp 全程沿运动方向拉长（牵丝），layer/puff 仅消散期轻拉
       stretchAngle: 0,
       stretchAmount: 0,
       // 尺寸
@@ -341,14 +345,17 @@
       life: 0,
       lifespan,
       phase: 'born', // born → active → dissipating → dead
-      // 透明度（稍微提高基值，因为无残留叠加后整体可见）
-      baseAlpha: style === 'puff'
+      // 透明度：baseAlpha 乘随机倍率，产生虚实层次（非均匀一团）
+      baseAlpha: (style === 'puff'
         ? (depth > 1 ? 0.25 : 0.19)
         : style === 'layer'
           ? 0.18
-          : 0.14,
+          : 0.14) * alphaMul,
       alpha: 0,
       squishY,
+      // 虚实呼吸：每个粒子独立的慢周期浓淡起伏（避免均匀"团毛"感）
+      breathSeed: Math.random() * Math.PI * 2,
+      breathFreq: 0.4 + Math.random() * 0.5, // 周期 ~10-15s
       // spawn 时先置 non-zero alpha 标记，避免首帧就被 alpha<0.004 误清理
       _born: true,
     });
@@ -384,8 +391,8 @@
     pointerVX = 0; pointerVY = 0;
     spawnAccumulator = 0;
     holdTimer = 0;
-    // 点击生成 12-20 个（密度再加倍），spread 极小（点哪里在哪里）
-    const burst = 12 + ((Math.random() * 9) | 0);
+    // 点击生成 8-13 个（密度降低 1/3），spread 极小（点哪里在哪里）
+    const burst = 8 + ((Math.random() * 6) | 0);
     for (let i = 0; i < burst; i++)
       spawnParticle(pointerX, pointerY, { spread: 18 });
   });
@@ -429,16 +436,16 @@
       }
     }
 
-    // 沿轨迹生成新粒子（密度再加倍：STEP 12→6，每步 4-6 个）
+    // 沿轨迹生成新粒子（密度降低 1/3：STEP 6→9，每步 3-4 个）
     const densityScale = Math.min(1.1, 0.5 + dist * 0.015);
     spawnAccumulator += dist * densityScale;
-    const STEP = 6; // 步长再减半，密度再加倍
+    const STEP = 9; // 步长加大 1/3，密度降低
     while (spawnAccumulator >= STEP) {
       spawnAccumulator -= STEP;
       const t = 1 - (spawnAccumulator / STEP);
       const ix = lastPX - dx * t;
       const iy = lastPY - dy * t;
-      const n = 4 + ((Math.random() * 3) | 0); // 每步 4-6 个（再加倍）
+      const n = 3 + ((Math.random() * 2) | 0); // 每步 3-4 个（降低 1/3）
       for (let i = 0; i < n; i++)
         spawnParticle(ix, iy, {
           vx: pointerVX * 0.045, // 继承手指速度，跟随移动
@@ -497,10 +504,10 @@
 
     if (!isPointerDown) { pointerVX *= 0.9; pointerVY *= 0.9; }
 
-    // 按住不放：持续生成新粒子（密度再加倍：0.09s → 0.045s 生成 1 个）
+    // 按住不放：持续生成新粒子（密度降低 1/3：0.045s → 0.068s 生成 1 个）
     if (isPointerDown) {
       holdTimer += dt;
-      if (holdTimer > 0.045) { // 每 ~0.045s 生成 1 个（频率再加倍）
+      if (holdTimer > 0.068) { // 每 ~0.068s 生成 1 个（频率降低 1/3）
         holdTimer = 0;
         spawnParticle(pointerX, pointerY, { spread: 15, vx: pointerVX * 0.03, vy: pointerVY * 0.03 });
       }
@@ -564,11 +571,26 @@
       const rotMul = p.phase === 'dissipating' ? 0.7 : 1.0;
       p.rot += p.rotSpeed * dtFrames * rotMul;
 
-      // 消散期：极微弱沿运动方向拉伸（不突兀）
-      if (p.phase === 'dissipating' && vlen > 0.15) {
+      // === 拉伸：wisp 全程沿运动方向拉长（牵丝），layer/puff 仅消散期轻拉 ===
+      // 解决"椭圆团毛"问题：wisp 是丝状，应始终被运动拉成牵丝
+      if (vlen > 0.08) {
         p.stretchAngle = Math.atan2(p.vy, p.vx);
-        const disU = (u - 0.55) / 0.45; // 0→1
-        p.stretchAmount = disU * 0.22; // 最多拉伸 22%（轻柔）
+        if (p.style === 'wisp') {
+          // wisp：active 开始就拉伸（0.30），消散期更拉长（0.55），形成牵丝飘带
+          const baseStretch = p.phase === 'dissipating' ? 0.55 : 0.30;
+          // 拉伸量随速度增强（运动越快丝越长）
+          const speedFactor = Math.min(1, vlen / 0.5);
+          p.stretchAmount = baseStretch * speedFactor;
+        } else if (p.phase === 'dissipating' && vlen > 0.15) {
+          // layer/puff 仅消散期轻拉
+          const disU = (u - 0.55) / 0.45;
+          p.stretchAmount = disU * 0.22;
+        } else {
+          p.stretchAmount = 0;
+        }
+      } else {
+        // 速度过低：wisp 保持轻微拉伸（维持丝状），其他归零
+        p.stretchAmount = p.style === 'wisp' ? 0.12 : 0;
       }
 
       // 尺寸：全程连续生长（无拐点），born 缓慢生长 → active 极缓聚集 → dissipating 轻微扩散
@@ -607,6 +629,12 @@
         lifeAlpha = 0.96 * remain * remain * (3 - 2 * remain);
       }
       p.alpha = p.baseAlpha * lifeAlpha;
+      // 虚实呼吸：active/dissipating 段加入慢周期浓淡起伏（±15%）
+      // 解决"一团毛"均匀感：让云团局部有浓有淡，似云有实有虚
+      if (p.phase !== 'born') {
+        const breath = Math.sin(p.life * p.breathFreq + p.breathSeed) * 0.15;
+        p.alpha *= (1 + breath);
+      }
       // _born 保护期：直到 born 阶段结束（u>=0.08）才允许 alpha 阈值清理
       // 避免 born 早期 alpha 接近 0 时被误删
       if (p._born && u >= 0.08) p._born = false;
