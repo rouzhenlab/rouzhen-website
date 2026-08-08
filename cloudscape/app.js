@@ -120,10 +120,11 @@
   let relT=0;
   function autoRelTick(){relT++;if(relT<60)return;relT=0;const ov=samplingPoints.length-TARGET_COUNT;if(ov<=0)return;const tr=Math.min(ov,60);for(let i=0;i<tr;i++){if(samplingPoints.length<=TARGET_COUNT)break;const idx=((globalFrameCounter*13+i*17)>>>0)%samplingPoints.length;releaseSamplingPoint(idx);}}
   let px=0,py=0,pvx=0,pvy=0,down=false,holdT=0;
+  let clickWarmup=0;
   let interactionMode='cloud';
   function getPos(e){const r=canvas.getBoundingClientRect();let cx,cy;if(e.touches&&e.touches[0]){cx=e.touches[0].clientX;cy=e.touches[0].clientY;}else{cx=e.clientX;cy=e.clientY;}return{x:(cx-r.left)*(canvas.width/dpr)/r.width,y:(cy-r.top)*(canvas.height/dpr)/r.height};}
-  function pd(e){e.preventDefault();const p=getPos(e);px=p.x;py=p.y;pvx=pvy=0;down=true;holdT=0;if(expM===4&&stF===-1)stF=globalFrameCounter;if(interactionMode==='cloud')injectCloudEvent(px,py,{count:10});}
-  function pm(e){e.preventDefault();const p=getPos(e);const ox=px,oy=py;px=p.x;py=p.y;pvx=0.6*pvx+0.4*(px-ox);pvy=0.6*pvy+0.4*(py-oy);if(down){if(expM===4&&stF===-1)stF=globalFrameCounter;if(interactionMode==='cloud'){const spd=Math.hypot(pvx,pvy);if(spd>0.5){injectCloudEvent(px,py,{count:4,spread:20,vx:pvx*0.03,vy:pvy*0.03});}else{injectCloudEvent(px,py,{count:4,spread:20});}autoRelTick();}const wa=Math.min(1.2,spd*0.08);if(wa>0.04)depositWake(px,py,pvx*0.04,pvy*0.04,wa);}}
+  function pd(e){e.preventDefault();const p=getPos(e);px=p.x;py=p.y;pvx=pvy=0;down=true;holdT=0;clickWarmup=5;if(expM===4&&stF===-1)stF=globalFrameCounter;if(interactionMode==='cloud')injectCloudEvent(px,py,{count:10});}
+  function pm(e){e.preventDefault();const p=getPos(e);const ox=px,oy=py;px=p.x;py=p.y;const dx=px-ox,dy=py-oy;const maxStep=8;const step=Math.hypot(dx,dy);if(step>maxStep){const k=maxStep/step;pvx=0.6*pvx+0.4*dx*k;pvy=0.6*pvy+0.4*dy*k;}else{pvx=0.6*pvx+0.4*dx;pvy=0.6*pvy+0.4*dy;}if(down){if(expM===4&&stF===-1)stF=globalFrameCounter;const wp=clickWarmup>0?Math.max(0,1-clickWarmup/5):1;if(interactionMode==='cloud'){const spd=Math.hypot(pvx,pvy);if(spd>0.5){injectCloudEvent(px,py,{count:4,spread:20,vx:pvx*0.03,vy:pvy*0.03});}else{injectCloudEvent(px,py,{count:4,spread:20});}autoRelTick();}const wa=Math.min(1.2,Math.hypot(pvx,pvy)*0.08)*wp;if(wa>0.04)depositWake(px,py,pvx*0.04,pvy*0.04,wa);}}
   function pu(){down=false;}
   canvas.addEventListener('mousedown',pd);window.addEventListener('mousemove',pm);window.addEventListener('mouseup',pu);
   canvas.addEventListener('touchstart',pd,{passive:false});canvas.addEventListener('touchmove',pm,{passive:false});canvas.addEventListener('touchend',pu);
@@ -247,6 +248,7 @@
     globalFrameCounter++;wT+=dt;cT+=dt*0.5;
     stepWake(dF);
     if(!down){pvx*=0.9;pvy*=0.9;}
+    if(clickWarmup>0)clickWarmup=Math.max(0,clickWarmup-dF);
     if(down&&expM===0){
       holdT+=dt;
       if(holdT>0.145){holdT=0;const spd=Math.hypot(pvx,pvy);injectCloudEvent(px,py,{count:4+((Math.random()*4)|0),spread:20,scaleBias:0.94,vx:spd>0.5?pvx*0.03:0,vy:spd>0.5?pvy*0.03:0});}
@@ -271,8 +273,9 @@
       const sl=Math.min(SHEAR_LOSS_CAP,g.shear*SHEAR_LOSS_SCALE);
       const tl=Math.min(TOTAL_LOSS_CAP,dl+sl);
       s.density*=(1-tl);
-      s.alpha=s.baseAlpha*s.density*(1+Math.sin((s.x*0.00019+s.y*0.00021)+s.breathSeed+cT*s.breathFreq)*0.12);
-      if(s.density<0.0022){releaseSamplingPoint(i);continue;}
+      const dFade=s.density<0.05?s.density/0.05:1;
+      s.alpha=s.baseAlpha*s.density*dFade*(1+Math.sin((s.x*0.00019+s.y*0.00021)+s.breathSeed+cT*s.breathFreq)*0.12);
+      if(s.density<0.01){releaseSamplingPoint(i);continue;}
       if((s.x<-250||s.x>viewW+250||s.y<-250||s.y>viewH+250)&&s.alpha<0.014)releaseSamplingPoint(i);
     }
     lE();
