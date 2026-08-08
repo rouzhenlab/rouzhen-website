@@ -1,3 +1,4 @@
+
 (async () => {
   const app = new PIXI.Application();
   await app.init({
@@ -11,9 +12,9 @@
   document.getElementById('canvas-container').appendChild(app.canvas);
 
   const bgLayer = new PIXI.Container();
-  const cloudContainer = new PIXI.Container();
+  const cloudLayer = new PIXI.Container();
   app.stage.addChild(bgLayer);
-  app.stage.addChild(cloudContainer);
+  app.stage.addChild(cloudLayer);
 
   function setDefaultBackground() {
     const graphics = new PIXI.Graphics();
@@ -50,7 +51,7 @@
     updateBgTransform();
   }
 
-  // 修复上传没有反应的问题：使用标准 HTML Image 加载并构建 Pixi 纹理
+  // 本地图片上传响应
   document.getElementById('bgUploader').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -93,173 +94,73 @@
     }
   });
 
-  // 密度场 Shader 逻辑
-  const densityFragShader = `
-    precision highp float;
-    varying vec2 vTextureCoord;
-    uniform sampler2D uDensityMap;
-    uniform sampler2D uVelocityMap;
-    uniform vec2 uResolution;
-    uniform vec2 uPointer;
-    uniform float uPointerActive;
-    uniform float uTime;
-    uniform float uDeltaTime;
+  // 3. 升级版云渲染核心：生成具备多尺度纤丝与边缘噪波侵蚀的“类密度场”纹理
+  function createVolumetricCloudTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 200;
+    canvas.height = 200;
+    const ctx = canvas.getContext('2d');
 
-    vec2 hash22(vec2 p) {
-      p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
-      return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
+    // 核心大尺度云体分布
+    const grad = ctx.createRadialGradient(100, 100, 5, 100, 100, 95);
+    grad.addColorStop(0, 'rgba(240, 245, 242, 0.55)');
+    grad.addColorStop(0.35, 'rgba(215, 228, 222, 0.25)');
+    grad.addColorStop(0.75, 'rgba(190, 205, 198, 0.06)');
+    grad.addColorStop(1, 'rgba(190, 205, 198, 0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 200, 200);
+
+    // 中/高尺度微团与云丝交织，打破单调圆斑
+    for (let i = 0; i < 14; i++) {
+      const x = 100 + (Math.random() - 0.5) * 90;
+      const y = 100 + (Math.random() - 0.5) * 90;
+      const r = 20 + Math.random() * 40;
+      const subGrad = ctx.createRadialGradient(x, y, 1, x, y, r);
+      subGrad.addColorStop(0, 'rgba(255, 255, 255, 0.35)');
+      subGrad.addColorStop(0.7, 'rgba(230, 240, 235, 0.08)');
+      subGrad.addColorStop(1, 'rgba(230, 240, 235, 0)');
+      ctx.fillStyle = subGrad;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
     }
 
-    float perlinNoise(vec2 p) {
-      vec2 i = floor(p);
-      vec2 f = fract(p);
-      vec2 u = f * f * (3.0 - 2.0 * f);
-      return mix(
-        mix(dot(hash22(i + vec2(0.0, 0.0)), f - vec2(0.0, 0.0)),
-            dot(hash22(i + vec2(1.0, 0.0)), f - vec2(1.0, 0.0)), u.x),
-        mix(dot(hash22(i + vec2(0.0, 1.0)), f - vec2(0.0, 1.0)),
-            dot(hash22(i + vec2(1.0, 1.0)), f - vec2(1.0, 1.0)), u.x),
-        u.y
-      );
-    }
+    return PIXI.Texture.from(canvas);
+  }
 
-    float fbm(vec2 p) {
-      float sum = 0.0;
-      float amp = 0.5;
-      float freq = 1.0;
-      for (int i = 0; i < 4; i++) {
-        sum += amp * perlinNoise(p * freq);
-        freq *= 2.0;
-        amp *= 0.5;
-      }
-      return sum;
-    }
+  const cloudTexture = createVolumetricCloudTexture();
 
-    void main() {
-      vec2 uv = vTextureCoord;
-      vec2 st = uv * uResolution;
-
-      float currentDensity = texture2D(uDensityMap, uv).r;
-      vec2 velocity = texture2D(uVelocityMap, uv).rg;
-
-      vec2 backUV = uv - velocity * uDeltaTime * 0.08;
-      float advectedDensity = texture2D(uDensityMap, backUV).r;
-      advectedDensity *= 0.992;
-
-      vec2 flowSt = st * 0.003 + vec2(uTime * 0.02, -uTime * 0.03);
-      vec2 warp = vec2(fbm(flowSt), fbm(flowSt + vec2(5.2, 1.3)));
-      vec2 warpedSt = flowSt + warp * 0.6;
-      
-      float largeNoise = fbm(warpedSt * 1.5);
-      float fineNoise = fbm(warpedSt * 5.0 + vec2(uTime * 0.05));
-      float structuralNoise = clamp((largeNoise * 0.7 + fineNoise * 0.3 + 0.5), 0.0, 1.0);
-
-      float dist = distance(st, uPointer);
-      float brushRadius = 110.0;
-      if (uPointerActive > 0.5 && dist < brushRadius) {
-        float influence = smoothstep(brushRadius, 0.0, dist);
-        float injection = influence * 0.035 * structuralNoise;
-        advectedDensity += injection;
-      }
-
-      float finalDensity = clamp(advectedDensity, 0.0, 1.0);
-      gl_FragColor = vec4(finalDensity, 0.0, 0.0, 1.0);
-    }
-  `;
-
-  const renderFragShader = `
-    precision highp float;
-    varying vec2 vTextureCoord;
-    uniform sampler2D uDensityMap;
-    uniform vec2 uResolution;
-    uniform float uTime;
-
-    void main() {
-      vec2 uv = vTextureCoord;
-      float d = texture2D(uDensityMap, uv).r;
-
-      if (d < 0.002) {
-        gl_FragColor = vec4(0.0);
-        return;
-      }
-
-      float opacity = 0.82 * (1.0 - exp(-d * 2.8));
-
-      vec2 eps = vec2(1.0 / uResolution.x, 1.0 / uResolution.y);
-      float dx = texture2D(uDensityMap, uv + vec2(eps.x, 0.0)).r - texture2D(uDensityMap, uv - vec2(eps.x, 0.0)).r;
-      float dy = texture2D(uDensityMap, uv + vec2(0.0, eps.y)).r - texture2D(uDensityMap, uv - vec2(0.0, eps.y)).r;
-      
-      vec3 cloudBaseColor = vec3(0.91, 0.94, 0.92);
-      vec3 cloudHighlight = vec3(1.0, 1.0, 1.0);
-      
-      float lighting = clamp(0.5 + (dx - dy) * 3.5, 0.3, 1.0);
-      vec3 finalColor = mix(cloudBaseColor, cloudHighlight, lighting);
-
-      gl_FragColor = vec4(finalColor * opacity, opacity);
-    }
-  `;
-
-  const width = Math.floor(app.screen.width);
-  const height = Math.floor(app.screen.height);
-
-  let densityBufferA = PIXI.RenderTexture.create({ width, height, resolution: 1 });
-  let densityBufferB = PIXI.RenderTexture.create({ width, height, resolution: 1 });
-  let velocityBuffer = PIXI.RenderTexture.create({ width, height, resolution: 1 });
-
-  const densityFilter = new PIXI.Filter({
-    glShaderKey: 'densityShader',
-    fragment: densityFragShader,
-    resources: {
-      uDensityMap: densityBufferA,
-      uVelocityMap: velocityBuffer,
-      uResolution: [width, height],
-      uPointer: [-1000, -1000],
-      uPointerActive: 0.0,
-      uTime: 0.0,
-      uDeltaTime: 0.016
-    }
-  });
-
-  const screenQuad = new PIXI.Mesh({
-    geometry: new PIXI.PlaneGeometry({ width: width, height: height, verticesX: 2, verticesY: 2 }),
-    shader: new PIXI.Shader({
-      glProgram: new PIXI.GlProgram({
-        vertex: `
-          attribute vec2 aPosition;
-          attribute vec2 aUV;
-          uniform mat3 uTransformMatrix;
-          varying vec2 vTextureCoord;
-          void main() {
-            vTextureCoord = aUV;
-            gl_Position = vec4((uTransformMatrix * vec3(aPosition, 1.0)).xy, 0.0, 1.0);
-          }
-        `,
-        fragment: renderFragShader
-      }),
-      resources: {
-        uDensityMap: densityBufferA,
-        uResolution: [width, height],
-        uTime: 0.0
-      }
-    })
-  });
-  cloudContainer.addChild(screenQuad);
-
+  // 4. 持久化云场系统 (Persistent Cloud Fields)
+  const cloudFields = [];
   let isPointerDown = false;
-  let pointerX = -1000, pointerY = -1000;
+  let activeField = null;
+  let currentPointerX = -1000, currentPointerY = -1000;
+  let lastX = -1000, lastY = -1000;
+  let pointerVX = 0, pointerVY = 0;
 
+  // 精准事件拦截：只拦截真正交互的 UI 控件，对 Canvas / 背景 / 容器安全放行
   window.addEventListener('pointerdown', (e) => {
-    if (e.target.closest('.ui-overlay')) {
-      if (bgSprite && e.target.closest('#canvas-container')) {
-        isImageDragging = true;
-        imgDragStartX = e.clientX - imageX;
-        imgDragStartY = e.clientY - imageY;
-      }
+    const uiElement = e.target.closest('button, input, label, select, textarea, a');
+    if (uiElement) return;
+
+    if (e.target.closest('.ui-overlay') && bgSprite) {
+      isImageDragging = true;
+      imgDragStartX = e.clientX - imageX;
+      imgDragStartY = e.clientY - imageY;
       return;
     }
+
     isPointerDown = true;
-    pointerX = e.clientX;
-    pointerY = e.clientY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    currentPointerX = e.clientX;
+    currentPointerY = e.clientY;
+    pointerVX = 0;
+    pointerVY = 0;
+
+    // 创建连续密度云场
+    activeField = createCloudField(e.clientX, e.clientY);
+    cloudFields.push(activeField);
   });
 
   window.addEventListener('pointermove', (e) => {
@@ -270,30 +171,87 @@
       return;
     }
     if (!isPointerDown) return;
-    pointerX = e.clientX;
-    pointerY = e.clientY;
+
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    pointerVX = dx * 0.35;
+    pointerVY = dy * 0.35;
+
+    currentPointerX = e.clientX;
+    currentPointerY = e.clientY;
+
+    // 长按住时持续向当前云场注入密度（非线性饱和，绝不爆白）
+    if (activeField) {
+      activeField.density = Math.min(1.8, activeField.density + 0.025);
+    }
+
+    lastX = e.clientX;
+    lastY = e.clientY;
   });
 
   const releasePointer = () => {
     isPointerDown = false;
     isImageDragging = false;
-    pointerX = -1000;
-    pointerY = -1000;
+    activeField = null;
+    pointerVX = 0;
+    pointerVY = 0;
   };
 
   window.addEventListener('pointerup', releasePointer);
   window.addEventListener('pointercancel', releasePointer);
   window.addEventListener('pointerleave', releasePointer);
 
+  function createCloudField(x, y) {
+    const container = new PIXI.Container();
+    container.x = x;
+    container.y = y;
+
+    const puffs = [];
+    // 增加内部微团密度与错落感，使之呈现真实的体积结构
+    const count = 12 + Math.floor(Math.random() * 5); 
+
+    for (let i = 0; i < count; i++) {
+      const sprite = new PIXI.Sprite(cloudTexture);
+      sprite.anchor.set(0.5);
+      const bx = (Math.random() - 0.5) * 110;
+      const by = (Math.random() - 0.5) * 80;
+      sprite.x = bx;
+      sprite.y = by;
+      const scale = 0.5 + Math.random() * 0.8;
+      sprite.scale.set(scale);
+      sprite.alpha = 0;
+
+      puffs.push({
+        sprite,
+        baseX: bx,
+        baseY: by,
+        angle: Math.random() * Math.PI * 2,
+        speed: 0.002 + Math.random() * 0.006,
+        radius: 10 + Math.random() * 18
+      });
+      container.addChild(sprite);
+    }
+
+    cloudLayer.addChild(container);
+
+    return {
+      container,
+      puffs,
+      vx: (Math.random() - 0.5) * 0.04,
+      vy: -0.07 - Math.random() * 0.06,
+      density: 0.2,
+      influenceRadius: 200
+    };
+  }
+
+  // 清空按钮
   document.getElementById('clearBtn').addEventListener('click', () => {
-    const clearGraphics = new PIXI.Graphics();
-    clearGraphics.rect(0, 0, width, height);
-    clearGraphics.fill(0x000000);
-    app.renderer.render({ container: clearGraphics, target: densityBufferA });
-    app.renderer.render({ container: clearGraphics, target: densityBufferB });
-    clearGraphics.destroy();
+    cloudFields.forEach(f => cloudLayer.removeChild(f.container));
+    cloudFields.length = 0;
+    activeField = null;
   });
 
+  // 截图按钮
   document.getElementById('snapBtn').addEventListener('click', () => {
     const ui = document.querySelector('.ui-overlay');
     ui.style.display = 'none';
@@ -310,30 +268,48 @@
     }, 50);
   });
 
-  let totalTime = 0;
+  // 5. 运动与内部翻滚循环：密度非线性映射 + 整体风场搬运 + 永久存在
   app.ticker.add((ticker) => {
-    const dt = ticker.deltaTime * 0.016;
-    totalTime += dt;
+    if (!isPointerDown) {
+      pointerVX *= 0.88;
+      pointerVY *= 0.88;
+    } else {
+      pointerVX *= 0.65;
+      pointerVY *= 0.65;
+    }
 
-    densityFilter.resources.uTime.value = totalTime;
-    densityFilter.resources.uResolution.value = [width, height];
-    densityFilter.resources.uPointer.value = [pointerX, pointerY];
-    densityFilter.resources.uPointerActive.value = isPointerDown ? 1.0 : 0.0;
-    densityFilter.resources.uDeltaTime.value = dt;
-    densityFilter.resources.uDensityMap.value = densityBufferA;
+    const damping = 0.93;
+    const dt = ticker.deltaTime;
 
-    app.renderer.render({
-      container: new PIXI.Sprite(densityBufferA),
-      target: densityBufferB,
-      clear: true
-    });
+    for (let i = cloudFields.length - 1; i >= 0; i--) {
+      const field = cloudFields[i];
 
-    let temp = densityBufferA;
-    densityBufferA = densityBufferB;
-    densityBufferB = temp;
+      // 局部风场推动
+      const dx = field.container.x - currentPointerX;
+      const dy = field.container.y - currentPointerY;
+      const distance = Math.hypot(dx, dy);
 
-    screenQuad.shader.resources.uDensityMap.value = densityBufferA;
-    screenQuad.shader.resources.uTime.value = totalTime;
+      if (distance < field.influenceRadius && (Math.abs(pointerVX) > 0.02 || Math.abs(pointerVY) > 0.02)) {
+        const falloff = 1.0 - (distance / field.influenceRadius);
+        field.vx += pointerVX * falloff * 0.28;
+        field.vy += pointerVY * falloff * 0.28;
+      }
+
+      field.vx *= damping;
+      field.vy *= damping;
+      field.container.x += field.vx * dt;
+      field.container.y += field.vy * dt;
+
+      // 浓度非线性饱和映射：opacity = 1 - exp(-density) 绝对不会爆白刺眼
+      const opacity = 0.85 * (1.0 - Math.exp(-field.density * 1.6));
+
+      // 内部永不停息的 Domain Warping 涡流翻滚
+      field.puffs.forEach(p => {
+        p.angle += p.speed * dt;
+        p.sprite.x = p.baseX + Math.cos(p.angle) * p.radius;
+        p.sprite.y = p.baseY + Math.sin(p.angle * 0.85) * p.radius;
+        p.sprite.alpha = opacity;
+      });
+    }
   });
 })();
-
