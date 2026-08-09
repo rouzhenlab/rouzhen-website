@@ -116,7 +116,8 @@
     const grp={
       id:gid,cx,cy,vx:gvx,vy:gvy,
       driftAng:groupDriftAng,driftSpd:groupDriftSpd,
-      birthFrame:globalFrameCounter,count:n
+      birthFrame:globalFrameCounter,count:n,
+      fieldDiv:0,fieldShear:0
     };
     cloudGroups.push(grp);
     groupById.set(gid,grp);
@@ -264,6 +265,8 @@
     for(let gi=cloudGroups.length-1;gi>=0;gi--){
       const gr=cloudGroups[gi];
       const gg=sVG(gr.cx,gr.cy,0.5,0.5);
+      gr.fieldDiv=gg.divergence;
+      gr.fieldShear=gg.shear;
       const dp=Math.pow(0.985,dF);
       gr.driftAng+=(Math.random()-0.5)*0.04;
       const sdx=Math.cos(gr.driftAng)*gr.driftSpd*0.35;
@@ -281,14 +284,12 @@
       const grp=groupById.get(s.groupId);
       if(!grp){releaseSamplingPoint(i);continue;}
       s.x=grp.cx+s.relX;s.y=grp.cy+s.relY;
-      const sf=Math.min(1,Math.max(0,(s.curScale-0.05)/0.22));
-      const g=sVG(s.x,s.y,sf,s.depth);
       s.rot+=s.rotSpeed*dF;
-      s.stretchAmount=Math.min(0.5,g.shear*55);
+      s.stretchAmount=Math.min(0.5,grp.fieldShear*55);
       const gvl=Math.hypot(grp.vx,grp.vy);
       if(gvl>0.02)s.stretchAngle=Math.atan2(grp.vy,grp.vx);
-      const dl=Math.max(0,g.divergence)*DIV_LOSS_SCALE;
-      const sl=Math.min(SHEAR_LOSS_CAP,g.shear*SHEAR_LOSS_SCALE);
+      const dl=Math.max(0,grp.fieldDiv)*DIV_LOSS_SCALE;
+      const sl=Math.min(SHEAR_LOSS_CAP,grp.fieldShear*SHEAR_LOSS_SCALE);
       const tl=Math.min(TOTAL_LOSS_CAP,dl+sl);
       s.density*=(1-tl);
       const dFade=s.density<0.05?s.density/0.05:1;
