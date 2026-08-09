@@ -1,372 +1,320 @@
 (() => {
   'use strict';
+  // ============================================================
+  // Cloudscape — Field-first rebuild
+  //
+  // Cloud state = { density field D, residual-wind field U }
+  // evolving continuously in time. There is no particle, no
+  // sprite, no discrete "cloud object". Every pixel the user
+  // sees is a bilinear sample of a coarse scalar/vector field.
+  //
+  // Infra kept from the previous version (per spec §31):
+  // canvas element, resize handling, pointer input plumbing,
+  // background-image upload, clear/snapshot buttons.
+  // Everything else (particles, groups, wake grid, shear/div
+  // loss model) is gone — not migrated, not "frozen".
+  // ============================================================
+
   const canvas = document.getElementById('mainCanvas');
   const ctx = canvas.getContext('2d');
   let viewW = 0, viewH = 0, dpr = Math.max(1, window.devicePixelRatio || 1);
+
+  // ---- Core visual parameters (kept intentionally small) ----
+  const CFG = {
+    seedAmount: 1.35,     // density injected per click, before diffusion spreads it
+    decayRate: 0.0026,    // per-frame density decay (structure weakens -> dissolves)
+    diffusion: 0.16,      // per-pass diffusion blend strength
+    flowStrength: 0.85,   // ambient wind amplitude (field cells/frame)
+    noiseScale: 0.11,     // ambient wind spatial frequency
+    noiseSpeed: 0.35,     // ambient wind temporal evolution speed
+    windStrength: 2.2,    // how strongly pointer motion injects residual wind
+    windRadius: 5.5,      // pointer influence radius, in field cells
+    memoryDecay: 0.965    // residual wind decay per frame (atmospheric memory)
+  };
+
+  // ---- Field (simulation) resolution: low-res on purpose ----
+  let FW = 0, FH = 0, CELL = 9; // ~9 css px per field cell
+  let D = null, D2 = null;      // density, ping-pong scratch
+  let Ux = null, Uy = null;     // residual wind (memory)
+  let Ux2 = null, Uy2 = null;   // scratch for light diffusion of wind
+
+  // Offscreen low-res canvas the field is tone-mapped into,
+  // then upscaled onto the main canvas with smoothing.
+  let fieldCanvas = null, fieldCtx = null, fieldImg = null;
+
+  function idx(i, j) { return j * FW + i; }
+
+  function allocateField() {
+    FW = Math.max(48, Math.min(220, Math.round(viewW / CELL)));
+    FH = Math.max(32, Math.min(140, Math.round(viewH / CELL)));
+    D = new Float32Array(FW * FH);
+    D2 = new Float32Array(FW * FH);
+    Ux = new Float32Array(FW * FH);
+    Uy = new Float32Array(FW * FH);
+    Ux2 = new Float32Array(FW * FH);
+    Uy2 = new Float32Array(FW * FH);
+    fieldCanvas = document.createElement('canvas');
+    fieldCanvas.width = FW; fieldCanvas.height = FH;
+    fieldCtx = fieldCanvas.getContext('2d');
+    fieldImg = fieldCtx.createImageData(FW, FH);
+  }
+
   function resizeCanvas() {
     const w = window.innerWidth, h = window.innerHeight;
     viewW = w; viewH = h;
     canvas.width = Math.floor(w * dpr); canvas.height = Math.floor(h * dpr);
     canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    rebuildWakeGrid();
+    allocateField(); // re-forming the cloud on resize is an accepted tradeoff
   }
   window.addEventListener('resize', resizeCanvas);
-  const TARGET_COUNT = 620, MAX_COUNT_HARD = 1800, MAX_SCALE_SPAN = 0.27;
-  const samplingPoints = [];
-  const cloudGroups = [];
-  const groupById = new Map();
-  let nextGroupId = 0;
-  function makeInkTexture(seed) {
-    const SZ = 256;
-    const cc = document.createElement('canvas'); cc.width = SZ; cc.height = SZ;
-    const cx = cc.getContext('2d');
-    const cx0 = SZ/2 + (Math.random()-0.5)*18, cy0 = SZ/2 + (Math.random()-0.5)*18;
-    const layers = 5 + (seed % 3); let radius;
-    for (let l = 0; l < layers; l++) {
-      radius = SZ*0.18 + l*(SZ*0.075) + Math.random()*10;
-      const a = 0.34 - l*0.045;
-      const g = cx.createRadialGradient(cx0, cy0, radius*0.08, cx0, cy0, radius);
-      g.addColorStop(0, `rgba(240,240,240,${(0.9*a).toFixed(3)})`);
-      g.addColorStop(0.35, `rgba(220,220,220,${(0.72*a).toFixed(3)})`);
-      g.addColorStop(0.7, `rgba(180,180,180,${(0.38*a).toFixed(3)})`);
-      g.addColorStop(1, 'rgba(0,0,0,0)');
-      cx.fillStyle = g;
-      const ox = Math.cos(l*1.2+seed)*7*l*0.3, oy = Math.sin(l*1.7+seed*0.5)*7*l*0.3;
-      cx.beginPath();
-      if (seed % 3 === 2) cx.ellipse(cx0+ox, cy0+oy, radius*1.15, radius*0.72, (l+seed)*0.13, 0, Math.PI*2);
-      else {
-        for (let p = 0; p <= 48; p++) {
-          const ang = p/48*Math.PI*2;
-          const w = 1 + Math.sin(ang*3+l+seed)*0.06 + Math.sin(ang*5+l*2)*0.03 + Math.sin(ang*9+seed)*0.02;
-          const rx = (radius + (seed&1)*4)*w, ry = radius*w*0.93;
-          const x = cx0+ox+Math.cos(ang)*rx, y = cy0+oy+Math.sin(ang)*ry;
-          if (p===0) cx.moveTo(x,y); else cx.lineTo(x,y);
-        }
-        cx.closePath();
+
+  // ---- Background image (kept feature) ----
+  const bgImg = new Image(); let bgScale = 1, bgX = 0, bgY = 0;
+  window._bgSet = ({ url, scale, dx, dy }) => {
+    if (url) bgImg.src = url;
+    if (scale != null) bgScale = scale;
+    if (dx != null) bgX = dx; if (dy != null) bgY = dy;
+  };
+
+  // ---- Time-coherent noise helpers (no per-frame Math.random) ----
+  const seeds = []; for (let i = 0; i < 6; i++) seeds.push(Math.random() * 1000);
+
+  // Ambient wind: a smooth function of (cellX, cellY, time). Continuous
+  // in time by construction -- advancing t slightly changes the field
+  // slightly, never jumps.
+  function ambientFlow(i, j, t) {
+    const s = CFG.noiseScale, sp = CFG.noiseSpeed;
+    const vx = Math.sin(j * s + t * sp + seeds[0]) * 0.6
+             + Math.sin((i + j) * s * 0.5 - t * sp * 0.7 + seeds[1]) * 0.4;
+    const vy = Math.cos(i * s - t * sp * 0.8 + seeds[2]) * 0.6
+             + Math.cos((i - j) * s * 0.5 + t * sp * 0.5 + seeds[3]) * 0.4;
+    return { x: vx * CFG.flowStrength, y: vy * CFG.flowStrength };
+  }
+
+  // High-frequency, still time-coherent, used only at render time to
+  // give meso/micro-scale internal variation without touching the
+  // stored density (purely a visual multiply, never fed back).
+  function detailNoise(i, j, t) {
+    return 0.5 + 0.5 * Math.sin(i * 0.35 + seeds[4] + t * 0.6)
+                     * Math.cos(j * 0.31 - seeds[5] + t * 0.5);
+  }
+
+  function smoothstep(a, b, x) {
+    const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+    return t * t * (3 - 2 * t);
+  }
+
+  function bilinear(field, x, y) {
+    const c0 = Math.floor(x), r0 = Math.floor(y);
+    const c1 = c0 + 1, r1 = r0 + 1;
+    const cc0 = Math.max(0, Math.min(FW - 1, c0)), cc1 = Math.max(0, Math.min(FW - 1, c1));
+    const rr0 = Math.max(0, Math.min(FH - 1, r0)), rr1 = Math.max(0, Math.min(FH - 1, r1));
+    const tx = x - c0, ty = y - r0;
+    const v00 = field[idx(cc0, rr0)], v10 = field[idx(cc1, rr0)];
+    const v01 = field[idx(cc0, rr1)], v11 = field[idx(cc1, rr1)];
+    const a = v00 * (1 - tx) + v10 * tx;
+    const b = v01 * (1 - tx) + v11 * tx;
+    return a * (1 - ty) + b * ty;
+  }
+
+  // ---- Growth: injects a soft gaussian bump into D, not "particles" ----
+  function seedCloud(cx, cy, amount) {
+    const fi = cx / CELL, fj = cy / CELL;
+    const R = CFG.windRadius;
+    const i0 = Math.max(0, Math.floor(fi - R)), i1 = Math.min(FW - 1, Math.ceil(fi + R));
+    const j0 = Math.max(0, Math.floor(fj - R)), j1 = Math.min(FH - 1, Math.ceil(fj + R));
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        const d = Math.hypot(i - fi, j - fj);
+        if (d > R) continue;
+        const w = Math.exp(-(d * d) / (2 * (R * 0.55) * (R * 0.55)));
+        D[idx(i, j)] += amount * w;
       }
-      cx.fill();
     }
+  }
+
+  // ---- Pointer: represents wind/disturbance, not force on a cloud ----
+  let px = 0, py = 0, pvx = 0, pvy = 0, down = false, interactionMode = 'cloud';
+
+  function getPos(e) {
+    const r = canvas.getBoundingClientRect();
+    let cx, cy;
+    if (e.touches && e.touches[0]) { cx = e.touches[0].clientX; cy = e.touches[0].clientY; }
+    else { cx = e.clientX; cy = e.clientY; }
+    return { x: (cx - r.left) * (canvas.width / dpr) / r.width, y: (cy - r.top) * (canvas.height / dpr) / r.height };
+  }
+
+  function injectWind(x, y, vx, vy, strength) {
+    const fi = x / CELL, fj = y / CELL;
+    const R = CFG.windRadius;
+    const i0 = Math.max(0, Math.floor(fi - R)), i1 = Math.min(FW - 1, Math.ceil(fi + R));
+    const j0 = Math.max(0, Math.floor(fj - R)), j1 = Math.min(FH - 1, Math.ceil(fj + R));
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        const d = Math.hypot(i - fi, j - fj);
+        if (d > R) continue;
+        const w = (1 - d / R);
+        const k = idx(i, j);
+        Ux[k] += vx * strength * w * CFG.windStrength;
+        Uy[k] += vy * strength * w * CFG.windStrength;
+      }
+    }
+  }
+
+  function pd(e) {
+    e.preventDefault();
+    const p = getPos(e); px = p.x; py = p.y; pvx = pvy = 0; down = true;
+    if (interactionMode === 'cloud') seedCloud(px, py, CFG.seedAmount);
+  }
+  function pm(e) {
+    e.preventDefault();
+    const p = getPos(e); const ox = px, oy = py; px = p.x; py = p.y;
+    const dx = px - ox, dy = py - oy;
+    pvx = 0.6 * pvx + 0.4 * dx; pvy = 0.6 * pvy + 0.4 * dy;
+    if (down) {
+      const speed = Math.hypot(pvx, pvy);
+      if (speed > 0.3) injectWind(px, py, pvx / CELL, pvy / CELL, Math.min(1.4, speed * 0.03));
+    }
+  }
+  function pu() { down = false; }
+  canvas.addEventListener('mousedown', pd); window.addEventListener('mousemove', pm); window.addEventListener('mouseup', pu);
+  canvas.addEventListener('touchstart', pd, { passive: false }); canvas.addEventListener('touchmove', pm, { passive: false }); canvas.addEventListener('touchend', pu);
+
+  // ---- Simulation step ----
+  let simT = 0;
+  function stepSim(dF) {
+    simT += dF / 60;
+
+    // 1. Residual wind (atmospheric memory): light spatial diffusion
+    //    so disturbance eddies aren't needle-thin, then temporal decay.
+    for (let j = 0; j < FH; j++) {
+      for (let i = 0; i < FW; i++) {
+        const k = idx(i, j);
+        const iL = Math.max(0, i - 1), iR = Math.min(FW - 1, i + 1);
+        const jU = Math.max(0, j - 1), jB = Math.min(FH - 1, j + 1);
+        const avgX = (Ux[k] + Ux[idx(iL, j)] + Ux[idx(iR, j)] + Ux[idx(i, jU)] + Ux[idx(i, jB)]) / 5;
+        const avgY = (Uy[k] + Uy[idx(iL, j)] + Uy[idx(iR, j)] + Uy[idx(i, jU)] + Uy[idx(i, jB)]) / 5;
+        Ux2[k] = (Ux[k] * (1 - 0.25) + avgX * 0.25) * Math.pow(CFG.memoryDecay, dF);
+        Uy2[k] = (Uy[k] * (1 - 0.25) + avgY * 0.25) * Math.pow(CFG.memoryDecay, dF);
+      }
+    }
+    [Ux, Ux2] = [Ux2, Ux]; [Uy, Uy2] = [Uy2, Uy];
+
+    // 2. Advect density through (ambient flow + residual wind).
+    //    This is the ONLY thing that moves the cloud -- a field
+    //    flowing through itself, not an object translating.
+    for (let j = 0; j < FH; j++) {
+      for (let i = 0; i < FW; i++) {
+        const k = idx(i, j);
+        const amb = ambientFlow(i, j, simT);
+        const fx = amb.x + Ux[k], fy = amb.y + Uy[k];
+        const srcX = i - fx * dF * 0.35, srcY = j - fy * dF * 0.35;
+        D2[k] = bilinear(D, srcX, srcY);
+      }
+    }
+    [D, D2] = [D2, D];
+
+    // 3. Diffusion -- spreads density to neighbors, closing gaps and
+    //    softening structure at the SIMULATION level (not a render hack).
+    for (let j = 0; j < FH; j++) {
+      for (let i = 0; i < FW; i++) {
+        const k = idx(i, j);
+        const iL = Math.max(0, i - 1), iR = Math.min(FW - 1, i + 1);
+        const jU = Math.max(0, j - 1), jB = Math.min(FH - 1, j + 1);
+        const avg = (D[k] + D[idx(iL, j)] + D[idx(iR, j)] + D[idx(i, jU)] + D[idx(i, jB)]) / 5;
+        D2[k] = D[k] * (1 - CFG.diffusion) + avg * CFG.diffusion;
+      }
+    }
+    [D, D2] = [D2, D];
+
+    // 4. Decay -- dissolves into air, no lifecycle/delete logic per entity.
+    const decay = Math.pow(1 - CFG.decayRate, dF);
+    for (let k = 0; k < D.length; k++) D[k] *= decay;
+  }
+
+  // ---- Render: tone-map the field, then upscale with smoothing ----
+  function renderField() {
+    const data = fieldImg.data;
+    const lightX = 0.6, lightY = -0.8; // fake light direction for volume cue
+    for (let j = 0; j < FH; j++) {
+      for (let i = 0; i < FW; i++) {
+        const k = idx(i, j);
+        const iL = Math.max(0, i - 1), iR = Math.min(FW - 1, i + 1);
+        const jU = Math.max(0, j - 1), jB = Math.min(FH - 1, j + 1);
+        const gx = D[idx(iR, j)] - D[idx(iL, j)];
+        const gy = D[idx(i, jB)] - D[idx(i, jU)];
+        const shade = Math.max(0, Math.min(1, 0.5 + (gx * lightX + gy * lightY) * 6));
+
+        const dn = detailNoise(i, j, simT);
+        const dv = D[k] * (0.8 + 0.4 * dn); // micro/meso structure, render-only
+        const tone = smoothstep(0.05, 0.42, dv); // soft threshold: keeps hollows hollow, cores solid
+
+        const brightness = 205 + shade * 45;
+        const o = k * 4;
+        data[o] = brightness; data[o + 1] = brightness; data[o + 2] = brightness + 6;
+        data[o + 3] = Math.max(0, Math.min(255, tone * 235));
+      }
+    }
+    fieldCtx.putImageData(fieldImg, 0, 0);
+  }
+
+  // ---- Main loop ----
+  let wT = 0, lTS = performance.now();
+  function uR(ts) {
+    const dm = Math.min(50, ts - lTS); lTS = ts;
+    const dt = dm / 1000, dF = Math.max(0.3, dt * 60);
+    wT += dt;
+    if (!down) { pvx *= 0.9; pvy *= 0.9; }
+
+    stepSim(dF);
+    renderField();
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    ctx.fillStyle = '#050706'; ctx.fillRect(0, 0, viewW, viewH);
+    if (bgImg.complete && bgImg.naturalWidth > 0) {
+      const cw = bgImg.naturalWidth * bgScale, ch = bgImg.naturalHeight * bgScale;
+      ctx.drawImage(bgImg, viewW / 2 + bgX - cw / 2, viewH / 2 + bgY - ch / 2, cw, ch);
+    }
+    ctx.imageSmoothingEnabled = true;
+    ctx.globalCompositeOperation = 'screen';
+    ctx.drawImage(fieldCanvas, 0, 0, FW, FH, 0, 0, viewW, viewH);
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+
+    requestAnimationFrame(uR);
+  }
+
+  // ---- Kept UI hooks ----
+  function takeScreenshot() {
+    const s = new Date(), y = s.getFullYear(), m = String(s.getMonth() + 1).padStart(2, '0'), d = String(s.getDate()).padStart(2, '0'),
+      h = String(s.getHours()).padStart(2, '0'), mi = String(s.getMinutes()).padStart(2, '0'), se = String(s.getSeconds()).padStart(2, '0'),
+      fn = `云境留影_${y}${m}${d}_${h}${mi}${se}.png`;
     try {
-      const d = cx.getImageData(0,0,SZ,SZ); const dd = d.data;
-      for (let i = 0; i < dd.length; i += 4) {
-        const a = dd[i+3]; if (a > 0 && a < 120) {
-          const n = Math.random();
-          if (n < 0.17) dd[i+3] = Math.max(0,a-28);
-          else if (n < 0.28) dd[i+3] = Math.min(255,a+20);
-        }
-      }
-      cx.putImageData(d,0,0);
-    } catch(e) {}
-    cx.globalCompositeOperation = 'lighter';
-    const hl = cx.createRadialGradient(cx0-radius*0.25, cy0-radius*0.35, 0, cx0-radius*0.25, cy0-radius*0.35, radius*0.7);
-    hl.addColorStop(0,'rgba(255,255,255,0.13)'); hl.addColorStop(1,'rgba(0,0,0,0)');
-    cx.fillStyle = hl; cx.fillRect(0,0,SZ,SZ); cx.globalCompositeOperation = 'source-over';
-    return cc;
+      const u = canvas.toDataURL('image/png');
+      const a = document.createElement('a'); a.href = u; a.download = fn;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    } catch (e) { console.warn('[留影] 导出失败：', e); }
   }
-  const INK_TEXTURES = []; for (let i = 0; i < 8; i++) INK_TEXTURES.push(makeInkTexture(i));
-  const bgImg = new Image(); let bgScale=1, bgX=0, bgY=0;
-  window._bgSet = ({url,scale,dx,dy})=>{ if(url)bgImg.src=url; if(scale!=null)bgScale=scale; if(dx!=null)bgX=dx; if(dy!=null)bgY=dy; };
-  const WAKE_CELL = 36;
-  const WAKE_STRENGTH_SCALE = 0.25;
-  const DIV_LOSS_SCALE = 1.5, SHEAR_LOSS_SCALE = 0.33, SHEAR_LOSS_CAP = 0.013, TOTAL_LOSS_CAP = 0.018;
-  let curlNoiseSeeds = []; for (let i=0;i<24;i++) curlNoiseSeeds.push(Math.random()*1000);
-  let wakeCols=0, wakeRows=0, wakeVX=null, wakeVY=null, wakeAge=null;
-  function rebuildWakeGrid() {
-    wakeCols = Math.ceil(viewW/WAKE_CELL)+2; wakeRows = Math.ceil(viewH/WAKE_CELL)+2;
-    wakeVX = new Float32Array(wakeCols*wakeRows); wakeVY = new Float32Array(wakeCols*wakeRows); wakeAge = new Float32Array(wakeCols*wakeRows);
-  }
-  function depositWake(x,y,vx,vy,strength) {
-    const col = Math.floor(x/WAKE_CELL), row = Math.floor(y/WAKE_CELL);
-    for (let dr=-1; dr<=1; dr++) for (let dc=-1; dc<=1; dc++) {
-      const c=col+dc, r=row+dr; if (c<0||r<0||c>=wakeCols||r>=wakeRows) continue;
-      const w = 1 - Math.hypot(dc,dr)/1.8; if (w<=0) continue;
-      const idx = r*wakeCols+c;
-      wakeVX[idx] = wakeVX[idx]*(1-w*0.5) + vx*strength*w*WAKE_STRENGTH_SCALE;
-      wakeVY[idx] = wakeVY[idx]*(1-w*0.5) + vy*strength*w*WAKE_STRENGTH_SCALE;
-      if (wakeAge[idx]>0) wakeAge[idx] = Math.min(wakeAge[idx],2);
-    }
-  }
-  function sampleWake(x,y) {
-    const fx = x/WAKE_CELL, fy = y/WAKE_CELL;
-    const c0=Math.floor(fx), r0=Math.floor(fy), c1=c0+1, r1=r0+1;
-    if (c0<0||r0<0||c1>=wakeCols||r1>=wakeRows) return {x:0,y:0};
-    const tx=fx-c0, ty=fy-r0; let vx=0, vy=0, ws=0;
-    const cells=[[c0,r0],[c1,r0],[c0,r1],[c1,r1]], wts=[(1-tx)*(1-ty),tx*(1-ty),(1-tx)*ty,tx*ty];
-    for (let k=0;k<4;k++) { const [cx,ry]=cells[k], wt=wts[k]; const idx=ry*wakeCols+cx; const dec=Math.max(0,1-wakeAge[idx]/180); vx+=wakeVX[idx]*wt*dec; vy+=wakeVY[idx]*wt*dec; ws+=wt; }
-    if (ws===0) return {x:0,y:0}; return {x:vx/ws,y:vy/ws};
-  }
-  function stepWake(dtF) { const d = Math.pow(0.994,dtF); for (let i=0;i<wakeVX.length;i++){wakeVX[i]*=d;wakeVY[i]*=d;wakeAge[i]+=dtF;} }
-  function releaseSamplingPoint(i){ samplingPoints.splice(i,1); }
-  let globalFrameCounter = 0;
-  function m32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
-  const srand = s => m32((s*2654435761)>>>0);
-  function gauss(r,s){return Math.exp(-r*r/(2*s*s))}
-  function injectCloudEvent(cx,cy,opt){
-    const n = opt?.count??12, sp = opt?.spread??40, sb = opt?.scaleBias??1;
-    const seed = (Date.now()^(cx*73856093)^(cy*19349663))>>>0; const rnd = srand(seed);
-    const injectVx=opt?.vx??0, injectVy=opt?.vy??0;
-    const hasInject=injectVx!==0||injectVy!==0;
-    const groupAng=rnd()*Math.PI*2, groupSpd=0.03+rnd()*0.04;
-    const gvx=hasInject?injectVx:Math.cos(groupAng)*groupSpd;
-    const gvy=hasInject?injectVy:Math.sin(groupAng)*groupSpd;
-    const groupDriftAng=hasInject?Math.atan2(injectVy,injectVx):groupAng;
-    const groupDriftSpd=hasInject?Math.hypot(injectVx,injectVy)*0.6:groupSpd*0.6;
-    const gid = nextGroupId++;
-    const grp={
-      id:gid,cx,cy,vx:gvx,vy:gvy,
-      driftAng:groupDriftAng,driftSpd:groupDriftSpd,
-      birthFrame:globalFrameCounter,count:n,
-      fieldDiv:0,fieldShear:0
-    };
-    cloudGroups.push(grp);
-    groupById.set(gid,grp);
-    for (let i=0;i<n;i++){
-      const t1=rnd(),t2=rnd(),r=Math.sqrt(t1)*sp,th=t2*Math.PI*2,dx=Math.cos(th)*r,dy=Math.sin(th)*r;
-      const sdensity = gauss(r,sp*0.55), x=cx+dx, y=cy+dy;
-      const bs=(0.05+rnd()*MAX_SCALE_SPAN)*sb, ba=(0.18+rnd()*0.28)*(0.5+sdensity*0.5);
-      samplingPoints.push({groupId:gid,relX:dx,relY:dy,x,y,rot:rnd()*Math.PI*2,rotSpeed:(rnd()-0.5)*0.004,scale:bs,curScale:bs,baseAlpha:ba,alpha:ba,density:sdensity,tex:INK_TEXTURES[(seed+i)%8],depth:rnd(),stretchAmount:0,stretchAngle:0,breathSeed:rnd()*Math.PI*2,breathFreq:0.3+rnd()*0.8,squishY:0.78+rnd()*0.42,birthFrame:globalFrameCounter});
-    }
-    while(samplingPoints.length>MAX_COUNT_HARD){const i=((globalFrameCounter*13)>>>0)%samplingPoints.length;releaseSamplingPoint(i);}
-  }
-  let relT=0;
-  function autoRelTick(){}
-  let px=0,py=0,pvx=0,pvy=0,down=false,holdT=0;
-  let clickWarmup=0;
-  let interactionMode='cloud';
-  function getPos(e){const r=canvas.getBoundingClientRect();let cx,cy;if(e.touches&&e.touches[0]){cx=e.touches[0].clientX;cy=e.touches[0].clientY;}else{cx=e.clientX;cy=e.clientY;}return{x:(cx-r.left)*(canvas.width/dpr)/r.width,y:(cy-r.top)*(canvas.height/dpr)/r.height};}
-  function pd(e){e.preventDefault();const p=getPos(e);px=p.x;py=p.y;pvx=pvy=0;down=true;holdT=0;clickWarmup=5;if(expM===4&&stF===-1)stF=globalFrameCounter;if(interactionMode==='cloud')injectCloudEvent(px,py,{count:5});}
-  function pm(e){e.preventDefault();const p=getPos(e);const ox=px,oy=py;px=p.x;py=p.y;const dx=px-ox,dy=py-oy;const maxStep=8;const step=Math.hypot(dx,dy);if(step>maxStep){const k=maxStep/step;pvx=0.6*pvx+0.4*dx*k;pvy=0.6*pvy+0.4*dy*k;}else{pvx=0.6*pvx+0.4*dx;pvy=0.6*pvy+0.4*dy;}if(down){if(expM===4&&stF===-1)stF=globalFrameCounter;const wp=clickWarmup>0?Math.max(0,1-clickWarmup/5):1;const wa=Math.min(1.2,Math.hypot(pvx,pvy)*0.08)*wp;if(wa>0.04)depositWake(px,py,pvx*0.04,pvy*0.04,wa);const pushR=160,pushR2=pushR*pushR,pushMag=Math.min(0.1,Math.hypot(pvx,pvy)*0.025)*wp;if(pushMag>0.0015){for(const grp of cloudGroups){const dxg=grp.cx-px,dyg=grp.cy-py,d2=dxg*dxg+dyg*dyg;if(d2>pushR2)continue;const d=Math.sqrt(d2)+1e-4,f=1-d/pushR,p=f*f;grp.vx+=pvx*pushMag*p;grp.vy+=pvy*pushMag*p;}}}}
-  function pu(){down=false;}
-  canvas.addEventListener('mousedown',pd);window.addEventListener('mousemove',pm);window.addEventListener('mouseup',pu);
-  canvas.addEventListener('touchstart',pd,{passive:false});canvas.addEventListener('touchmove',pm,{passive:false});canvas.addEventListener('touchend',pu);
-  function sCurl(x,y){
-    if(expM!==0)return{x:0,y:0};
-    const s=curlNoiseSeeds,sc=0.0012,t=wT*0.3;
-    let a=0;
-    for(let i=0;i<8;i++){
-      const k1=0.4+i*0.22,k2=1.1+i*0.17;
-      a+=Math.sin(x*sc*k1+s[i*3])*Math.cos(y*sc*k2+s[i*3+1])*(1.2+i*0.08)+Math.sin((x+y)*sc*0.23+t+s[i*3+2])*0.9;
-    }
-    return{x:Math.cos(a)*0.1,y:Math.sin(a)*0.1};
-  }
-  function sWind(x,y){if(expM!==0)return{x:0,y:0};const b=0.006,s=curlNoiseSeeds,t=wT*0.12;return{x:b*(0.5+Math.sin(x*0.0008+s[22]+t*0.3)*0.25+Math.cos(y*0.0006+s[23])*0.25),y:b*(0.35*Math.cos(x*0.0007+s[21]-t*0.2)+0.25*Math.sin(y*0.0009+s[20]))}}
-  function sV(x,y,sf,dp){const wk=fC.wakeActive?sampleWake(x,y):{x:0,y:0};const cl=sCurl(x,y);const wd=sWind(x,y);const cw=fC.curlAmp*(0.7+dp*0.3+sf*0.1);return{x:(wd.x+cl.x*cw)*fC.windAmp+wk.x*1.8,y:(wd.y+cl.y*cw)*fC.windAmp+wk.y*1.8}}
-  function sVG(x,y,sf,dp){const E=4;const c=sV(x,y,sf,dp);const rx=sV(x+E,y,sf,dp),lx=sV(x-E,y,sf,dp),ry=sV(x,y+E,sf,dp),ly=sV(x,y-E,sf,dp);const dxdx=(rx.x-lx.x)/(2*E),dydy=(ry.y-ly.y)/(2*E),dxdy=(ry.x-ly.x)/(2*E),dydx=(rx.y-lx.y)/(2*E);return{vx:c.x,vy:c.y,divergence:dxdx+dydy,shear:Math.abs(dxdy)+Math.abs(dydx)+Math.abs(dxdx-dydy)*0.5}}
-  const ACC_N=600,ACC_S=30,ACC_AB=0.999,ACC_G=1e-5,ACC_CR=0.9;
-  let expM=0,expF=0,baseDen=0;
-  const defC={windAmp:0.07,curlAmp:1.0,wakeActive:true,impulseActive:true,impulseR:90,impulseMag:1.0};
-  let fC={...defC};
-  function aDen(){if(!samplingPoints.length)return 0;let s=0;for(const p of samplingPoints)s+=p.density;return s/samplingPoints.length}
-  function aGr(){if(!samplingPoints.length)return{ad:0,as:0,ag:0};let d=0,sh=0,c=0;for(const s of samplingPoints){const sf=Math.min(1,Math.max(0,(s.curScale-0.05)/MAX_SCALE_SPAN));const g=sVG(s.x,s.y,sf,s.depth);d+=g.divergence;sh+=g.shear;c++}return{ad:d/c,as:sh/c,ag:(Math.abs(d)+sh)/c}}
-  function aWk(){if(!samplingPoints.length)return 0;let s=0;for(const p of samplingPoints){const w=sampleWake(p.x,p.y);s+=Math.hypot(w.x,w.y)}return s/samplingPoints.length}
-  function startE(m){expM=m;expF=0;baseDen=0;samplingPoints.length=0;cloudGroups.length=0;groupById.clear();fC={...defC,windAmp:0,curlAmp:0,wakeActive:false,impulseActive:false};stF=-1;dSub=0;dLog=[];const cx=viewW*0.5,cy=viewH*0.5;if(m===1){injectCloudEvent(cx,cy,{count:14,spread:80})}else if(m===2){injectCloudEvent(cx,cy,{count:14,spread:80});for(const gr of cloudGroups){gr.vx+=0.3;}}else if(m===3){injectCloudEvent(cx,cy,{count:18,spread:80});for(const gr of cloudGroups){gr.vy+=0.003*(gr.cx-cx);}}else if(m===4){injectCloudEvent(cx,cy,{count:20,spread:110})}}
-  let stF=-1,dSub=0,dLog=[];
-  function sD(m){if(expM!==4)startE(4);if(m===1){fC.wakeActive=true;fC.impulseActive=false;}else if(m===2){fC.wakeActive=false;fC.impulseActive=true;}else{fC.wakeActive=true;fC.impulseActive=true;}dSub=m;stF=-1;dLog=[]}
-  function cD(){
-    const F=stF;
-    let oN=0,oD=0,oV=0,oG=0,oDi=0,oSh=0,oTL=0,nN=0,nD=0;
-    for (const s of samplingPoints){
-      const nw=F!==-1&&s.birthFrame>=F;
-      const sf=Math.min(1,Math.max(0,(s.curScale-0.05)/0.22));
-      const g=sVG(s.x,s.y,sf,s.depth);
-      const vm=Math.hypot(g.vx,g.vy);
-      const dl=Math.max(0,g.divergence)*DIV_LOSS_SCALE;
-      const sl=Math.min(SHEAR_LOSS_CAP,g.shear*SHEAR_LOSS_SCALE);
-      const tl=Math.min(TOTAL_LOSS_CAP,dl+sl);
-      if(nw){nN++;nD+=s.density;}
-      else{oN++;oD+=s.density;oV+=vm;oG+=Math.abs(g.divergence)+g.shear;oDi+=Math.abs(g.divergence);oSh+=g.shear;oTL+=tl;}
-    }
-    let wc=0,wt=0;
-    for(let i=0;i<wakeAge.length;i++){wt++;if(wakeAge[i]<60)wc++;}
-    return{frame:globalFrameCounter,subMode:dSub,stimF:F===-1?-1:globalFrameCounter-F,pointerSpeed:Math.hypot(pvx,pvy),wakeMag:aWk(),wakeAgeCov:wt?wc/wt:0,velMag:oN?oV/oN:0,gradMag:oN?oG/oN:0,div:oN?oDi/oN:0,shear:oN?oSh/oN:0,totalLoss:oN?oTL/oN:0,countOld:oN,countNew:nN,dOld:oN?oD/oN:0,dNew:nN?nD/nN:0}
-  }
-  function wD(){dLog.push(cD())}
-  function aD(m){
-    if(expM!==4||dSub!==m)sD(m);
-    const wo=m===1||m===3,io=m===2||m===3;
-    const NB=30,NS=20,NO=120;
-    const fx=viewW*0.1,fy=viewH*0.55,tx=viewW*0.9,ty=viewH*0.45;
-    const pvx0=(tx-fx)/NS,pvy0=(ty-fy)/NS;
-    stF=globalFrameCounter+NB;
-    let step=0;
-    const it=setInterval(()=>{
-      if(step>=NB&&step<NB+NS){
-        const t=(step-NB)/Math.max(1,NS-1);
-        const x=fx+(tx-fx)*t,y=fy+(ty-fy)*t,di=Math.hypot(pvx0,pvy0);
-        if(wo&&di>0.5)depositWake(x,y,pvx0*0.04,pvy0*0.04,1.0);
-        if(io&&di>0.5){
-          const r2=fC.impulseR*fC.impulseR,R=fC.impulseR,im=fC.impulseMag;
-          for(const gr of cloudGroups){
-            const dx=gr.cx-x,dy=gr.cy-y,d2=dx*dx+dy*dy;
-            if(d2>r2)continue;
-            const d=Math.sqrt(d2)+1e-4,f=1-d/R,p=f*f;
-            gr.vx+=pvx0*im*p;gr.vy+=pvy0*im*p;
-          }
-        }
-        if((step-NB)%2===0){
-          const a=Math.random()*6.28,r=12+Math.random()*18;
-          injectCloudEvent(x+Math.cos(a)*r,y+Math.sin(a)*r,{count:2+((Math.random()*2)|0),spread:20})
-        }
-        px=x;py=y;pvx=pvx0;pvy=pvy0;
-      }else{pvx=0;pvy=0;}
-      step++;
-      if(step>=NB+NS+NO){clearInterval(it);setTimeout(eD,50);}
-    },16);
-  }
-  function eD(){
-    const h=['frame','subMode','stimF','pointerSpeed','wakeMag','wakeAgeCov','velMag','gradMag','div','shear','totalLoss','countOld','countNew','dOld','dNew'];
-    const l=[h.join(',')];
-    for(const m of dLog)l.push([m.frame,m.subMode,m.stimF,m.pointerSpeed,m.wakeMag.toFixed(6),m.wakeAgeCov.toFixed(4),m.velMag.toFixed(6),m.gradMag.toFixed(6),m.div.toFixed(6),m.shear.toFixed(6),m.totalLoss.toFixed(6),m.countOld,m.countNew,m.dOld.toFixed(6),m.dNew.toFixed(6)].join(','));
-    window.__dbg_dCsv=l.join('\n')
-  }
-  function rE(){expM=0;expF=0;baseDen=0;fC={...defC};stF=-1;dSub=0;dLog=[];}
-  window.addEventListener('keydown',e=>{
-    switch(e.key){
-      case'0':rE();break;
-      case'1':startE(1);break;
-      case'2':startE(2);break;
-      case'3':startE(3);break;
-      case'4':startE(4);break;
-      case'6':sD(1);break;
-      case'7':sD(2);break;
-      case'8':sD(3);break;
-      case'9':eD();break;
-      case'R':case'r':if(e.shiftKey){if(dSub===0)break;aD(dSub);}break;
-    }
+  window.takeScreenshot = takeScreenshot;
+
+  const btnCloud = document.getElementById('modeCloud'), btnDrag = document.getElementById('modeDrag');
+  if (btnCloud) btnCloud.addEventListener('click', () => { interactionMode = 'cloud'; btnCloud.classList.add('active'); if (btnDrag) btnDrag.classList.remove('active'); });
+  if (btnDrag) btnDrag.addEventListener('click', () => { interactionMode = 'drag'; btnDrag.classList.add('active'); if (btnCloud) btnCloud.classList.remove('active'); });
+  const bgUploader = document.getElementById('bgUploader');
+  if (bgUploader) bgUploader.addEventListener('change', (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    const url = URL.createObjectURL(f); const img = new Image();
+    img.onload = () => { const sc = Math.min(viewW / img.naturalWidth, viewH / img.naturalHeight) * 0.92; window._bgSet({ url, scale: sc, dx: 0, dy: 0 }); };
+    img.src = url;
   });
-  const AT={A:null,B:null,C:null,D:null};
-  function jE(){
-    if(expF!==ACC_N)return;
-    const fd=aDen();
-    const rt=baseDen>0?fd/baseDen:1;
-    const gr=aGr();
-    let v=null;
-    if(expM===1){v={passed:rt>=ACC_AB,retention:rt};AT.A=v;}
-    else if(expM===2){v={passed:rt>=ACC_AB,retention:rt};AT.B=v;}
-    else if(expM===3){const hg=gr.ag>=ACC_G,dd=rt<=ACC_CR;v={passed:hg&&dd,retention:rt};AT.C=v;}
-  }
-  function lE(){
-    if(expM===0)return;
-    expF++;
-    if(expF===1&&baseDen===0)baseDen=aDen();
-    if(expM>=1&&expM<=3){if(expF%ACC_S===0){aDen();aGr();}jE();return;}
-    if(expM===4)wD();
-  }
-  let wT=0,cT=0,lTS=performance.now();
-  function uR(ts){
-    const dm=Math.min(50,ts-lTS);lTS=ts;
-    const dt=dm/1000,dF=Math.max(0.3,dt*60);
-    globalFrameCounter++;wT+=dt;cT+=dt*0.5;
-    stepWake(dF);
-    if(!down){pvx*=0.9;pvy*=0.9;}
-    if(clickWarmup>0)clickWarmup=Math.max(0,clickWarmup-dF);
-    const deadGids=new Set();
-    for(let gi=cloudGroups.length-1;gi>=0;gi--){
-      const gr=cloudGroups[gi];
-      const gg=sVG(gr.cx,gr.cy,0.5,0.5);
-      gr.fieldDiv=gg.divergence;
-      gr.fieldShear=gg.shear;
-      const dp=Math.pow(0.985,dF);
-      gr.driftAng+=(Math.random()-0.5)*0.04;
-      const sdx=Math.cos(gr.driftAng)*gr.driftSpd*0.35;
-      const sdy=Math.sin(gr.driftAng)*gr.driftSpd*0.35;
-      gr.vx=gr.vx*dp+(gg.vx*0.35+sdx)*dF;
-      gr.vy=gr.vy*dp+(gg.vy*0.35+sdy)*dF;
-      const mv=0.12,vl=Math.hypot(gr.vx,gr.vy);
-      if(vl>mv){gr.vx=gr.vx/vl*mv;gr.vy=gr.vy/vl*mv;}
-      gr.cx+=gr.vx*dF;gr.cy+=gr.vy*dF;
-      if(gr.cx<-300||gr.cx>viewW+300||gr.cy<-300||gr.cy>viewH+300){deadGids.add(gr.id);groupById.delete(gr.id);cloudGroups.splice(gi,1);}
-    }
-    for(let i=samplingPoints.length-1;i>=0;i--){
-      const s=samplingPoints[i];
-      if(deadGids.has(s.groupId)){releaseSamplingPoint(i);continue;}
-      const grp=groupById.get(s.groupId);
-      if(!grp){releaseSamplingPoint(i);continue;}
-      s.x=grp.cx+s.relX;s.y=grp.cy+s.relY;
-      s.rot+=s.rotSpeed*dF;
-      s.stretchAmount=Math.min(0.5,grp.fieldShear*55);
-      const gvl=Math.hypot(grp.vx,grp.vy);
-      if(gvl>0.02)s.stretchAngle=Math.atan2(grp.vy,grp.vx);
-      const dl=Math.max(0,grp.fieldDiv)*DIV_LOSS_SCALE;
-      const sl=Math.min(SHEAR_LOSS_CAP,grp.fieldShear*SHEAR_LOSS_SCALE);
-      const tl=Math.min(TOTAL_LOSS_CAP,dl+sl);
-      s.density*=(1-tl);
-      const dFade=s.density<0.05?s.density/0.05:1;
-      s.alpha=s.baseAlpha*dFade*(1+Math.sin((s.x*0.00019+s.y*0.00021)+s.breathSeed+cT*s.breathFreq)*0.12);
-      if(s.density<0.01){releaseSamplingPoint(i);continue;}
-      if((s.x<-250||s.x>viewW+250||s.y<-250||s.y>viewH+250)&&s.alpha<0.014)releaseSamplingPoint(i);
-    }
-    lE();
-    ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
-    ctx.fillStyle='#050706';ctx.fillRect(0,0,viewW,viewH);
-    if(bgImg.complete&&bgImg.naturalWidth>0){
-      const cw=bgImg.naturalWidth*bgScale,ch=bgImg.naturalHeight*bgScale;
-      ctx.drawImage(bgImg,viewW/2+bgX-cw/2,viewH/2+bgY-ch/2,cw,ch);
-    }
-    dC(samplingPoints);
-    ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
-  }
-  let bufCanvas=null, bufCtx=null;
-  function ensureBuf(){
-    if(!bufCanvas){bufCanvas=document.createElement('canvas');bufCtx=bufCanvas.getContext('2d');}
-    const w=Math.max(1,Math.floor(viewW*dpr)), h=Math.max(1,Math.floor(viewH*dpr));
-    if(bufCanvas.width!==w||bufCanvas.height!==h){bufCanvas.width=w;bufCanvas.height=h;}
-  }
-  function dC(list){
-    ensureBuf();
-    bufCtx.setTransform(dpr,0,0,dpr,0,0);
-    bufCtx.clearRect(0,0,viewW,viewH);
-    bufCtx.globalCompositeOperation='screen';
-    for(let i=0;i<list.length;i++){
-      const s=list[i];
-      if(s.alpha<0.0003)continue;
-      const tw=s.tex.width*s.curScale,th=s.tex.height*s.curScale*s.squishY;
-      bufCtx.save();
-      bufCtx.translate(s.x,s.y);
-      if(s.stretchAmount>0.01){bufCtx.rotate(s.stretchAngle);bufCtx.scale(1+s.stretchAmount,1-s.stretchAmount*0.3);}
-      else bufCtx.rotate(s.rot);
-      bufCtx.globalAlpha=s.alpha;
-      bufCtx.drawImage(s.tex,-tw/2,-th/2,tw,th);
-      bufCtx.restore();
-    }
-    // Fusion pass: merge discrete particle blobs into a continuous mass.
-    // Wide, low-alpha blur closes the gaps between nearby particles;
-    // a second, narrower blur pass on top preserves internal density
-    // variation so the result isn't a flat, featureless haze.
-    ctx.save();
-    ctx.setTransform(1,0,0,1,0,0);
-    ctx.globalCompositeOperation='screen';
-    ctx.filter=`blur(${(14*dpr).toFixed(1)}px)`;
-    ctx.globalAlpha=0.55;
-    ctx.drawImage(bufCanvas,0,0);
-    ctx.filter=`blur(${(3*dpr).toFixed(1)}px)`;
-    ctx.globalAlpha=1;
-    ctx.drawImage(bufCanvas,0,0);
-    ctx.restore();
-  }
-  window.__dbg={samplingPoints,canvas,sCurl,sWind,sV,sVG,fC,expM};
-  function takeScreenshot(){
-    const s=new Date(),y=s.getFullYear(),m=String(s.getMonth()+1).padStart(2,'0'),d=String(s.getDate()).padStart(2,'0'),
-      h=String(s.getHours()).padStart(2,'0'),mi=String(s.getMinutes()).padStart(2,'0'),se=String(s.getSeconds()).padStart(2,'0'),
-      fn=`云境留影_${y}${m}${d}_${h}${mi}${se}.png`;
-    try{
-      const u=canvas.toDataURL('image/png');
-      const a=document.createElement('a');a.href=u;a.download=fn;
-      document.body.appendChild(a);a.click();document.body.removeChild(a);
-    }catch(e){console.warn('[留影] 导出失败：',e);}
-  }
-  window.takeScreenshot=takeScreenshot;
-  const btnCloud=document.getElementById('modeCloud'),btnDrag=document.getElementById('modeDrag');
-  if(btnCloud)btnCloud.addEventListener('click',()=>{interactionMode='cloud';btnCloud.classList.add('active');if(btnDrag)btnDrag.classList.remove('active');});
-  if(btnDrag)btnDrag.addEventListener('click',()=>{interactionMode='drag';btnDrag.classList.add('active');if(btnCloud)btnCloud.classList.remove('active');});
-  const bgUploader=document.getElementById('bgUploader');
-  if(bgUploader)bgUploader.addEventListener('change',(e)=>{const f=e.target.files[0];if(!f)return;const url=URL.createObjectURL(f);const img=new Image();img.onload=()=>{const sc=Math.min(viewW/img.naturalWidth,viewH/img.naturalHeight)*0.92;window._bgSet({url,scale:sc,dx:0,dy:0});};img.src=url;});
-  const clearBtn=document.getElementById('clearBtn');
-  if(clearBtn)clearBtn.addEventListener('click',()=>{samplingPoints.length=0;cloudGroups.length=0;groupById.clear();});
-  const snapBtn=document.getElementById('snapBtn');
-  if(snapBtn)snapBtn.addEventListener('click',takeScreenshot);
-  resizeCanvas();lTS=performance.now();
-  function f(ts){uR(ts);requestAnimationFrame(f);}
-  requestAnimationFrame(f);
+  const clearBtn = document.getElementById('clearBtn');
+  if (clearBtn) clearBtn.addEventListener('click', () => { D.fill(0); Ux.fill(0); Uy.fill(0); });
+  const snapBtn = document.getElementById('snapBtn');
+  if (snapBtn) snapBtn.addEventListener('click', takeScreenshot);
+
+  window.__dbg = { get D() { return D; }, get Ux() { return Ux; }, get Uy() { return Uy; }, FW: () => FW, FH: () => FH, CFG };
+
+  resizeCanvas(); lTS = performance.now();
+  requestAnimationFrame(uR);
 })();
