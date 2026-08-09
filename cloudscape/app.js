@@ -145,11 +145,12 @@
   }
   let px=0,py=0,pvx=0,pvy=0,down=false;
   let clickWarmup=0;
+  let holdT=0,holdDist=0,lastBirthT=0,lastHoldMoveT=0;
   let interactionMode='cloud';
   function getPos(e){const r=canvas.getBoundingClientRect();let cx,cy;if(e.touches&&e.touches[0]){cx=e.touches[0].clientX;cy=e.touches[0].clientY;}else{cx=e.clientX;cy=e.clientY;}return{x:(cx-r.left)*(canvas.width/dpr)/r.width,y:(cy-r.top)*(canvas.height/dpr)/r.height};}
-  function pd(e){e.preventDefault();const p=getPos(e);px=p.x;py=p.y;pvx=pvy=0;down=true;clickWarmup=5;if(expM===4&&stF===-1)stF=globalFrameCounter;if(interactionMode==='cloud')injectCloudEvent(px,py,{count:CC.clickCount,spread:CC.clickSpread*viewScale});}
-  function pm(e){e.preventDefault();const p=getPos(e);const ox=px,oy=py;px=p.x;py=p.y;const dx=px-ox,dy=py-oy;const maxStep=8;const step=Math.hypot(dx,dy);if(step>maxStep){const k=maxStep/step;pvx=0.6*pvx+0.4*dx*k;pvy=0.6*pvy+0.4*dy*k;}else{pvx=0.6*pvx+0.4*dx;pvy=0.6*pvy+0.4*dy;}if(down){if(expM===4&&stF===-1)stF=globalFrameCounter;const wp=clickWarmup>0?Math.max(0,1-clickWarmup/5):1;const wa=Math.min(1.2,Math.hypot(pvx,pvy)*0.08)*wp;if(wa>0.04)depositWake(px,py,pvx*0.04,pvy*0.04,wa);const pushR=CC.pushRadius*viewScale,pushR2=pushR*pushR,pushMag=Math.min(CC.pushMagMax,Math.hypot(pvx,pvy)*CC.pushMagCoef)*wp;if(pushMag>0.0015){for(const grp of cloudGroups){const dxg=grp.cx-px,dyg=grp.cy-py,d2=dxg*dxg+dyg*dyg;if(d2>pushR2)continue;const d=Math.sqrt(d2)+1e-4,f=1-d/pushR,p=f*f;grp.vx+=pvx*pushMag*p;grp.vy+=pvy*pushMag*p;}}}}
-  function pu(){down=false;}
+  function pd(e){e.preventDefault();const p=getPos(e);px=p.x;py=p.y;pvx=pvy=0;down=true;clickWarmup=5;holdT=0;holdDist=0;lastBirthT=0;lastHoldMoveT=0;if(expM===4&&stF===-1)stF=globalFrameCounter;if(interactionMode==='cloud')injectCloudEvent(px,py,{count:CC.clickCount,spread:CC.clickSpread*viewScale});}
+  function pm(e){e.preventDefault();const p=getPos(e);const ox=px,oy=py;px=p.x;py=p.y;const dx=px-ox,dy=py-oy;const maxStep=8;const step=Math.hypot(dx,dy);if(step>maxStep){const k=maxStep/step;pvx=0.6*pvx+0.4*dx*k;pvy=0.6*pvy+0.4*dy*k;}else{pvx=0.6*pvx+0.4*dx;pvy=0.6*pvy+0.4*dy;}if(down){holdDist+=Math.hypot(px-ox,py-oy);lastHoldMoveT=0;if(expM===4&&stF===-1)stF=globalFrameCounter;const wp=clickWarmup>0?Math.max(0,1-clickWarmup/5):1;const wa=Math.min(1.2,Math.hypot(pvx,pvy)*0.08)*wp;if(wa>0.04)depositWake(px,py,pvx*0.04,pvy*0.04,wa);const pushR=CC.pushRadius*viewScale,pushR2=pushR*pushR,pushMag=Math.min(CC.pushMagMax,Math.hypot(pvx,pvy)*CC.pushMagCoef)*wp;if(pushMag>0.0015){for(const grp of cloudGroups){const dxg=grp.cx-px,dyg=grp.cy-py,d2=dxg*dxg+dyg*dyg;if(d2>pushR2)continue;const d=Math.sqrt(d2)+1e-4,f=1-d/pushR,p=f*f;grp.vx+=pvx*pushMag*p;grp.vy+=pvy*pushMag*p;}}}}
+  function pu(){down=false;holdT=0;holdDist=0;lastBirthT=0;lastHoldMoveT=0;}
   canvas.addEventListener('mousedown',pd);window.addEventListener('mousemove',pm);window.addEventListener('mouseup',pu);
   canvas.addEventListener('touchstart',pd,{passive:false});canvas.addEventListener('touchmove',pm,{passive:false});canvas.addEventListener('touchend',pu);
   function sCurl(x,y){
@@ -275,6 +276,31 @@
     stepWake(dF);
     if(!down){pvx*=0.9;pvy*=0.9;}
     if(clickWarmup>0)clickWarmup=Math.max(0,clickWarmup-dF);
+    if(down&&interactionMode==='cloud'){
+      holdT+=dt;lastHoldMoveT+=dt;
+      const movedRecently=lastHoldMoveT<0.07;
+      const triggerDist=16*viewScale;
+      const baseSp=CC.clickSpread*viewScale;
+      if(!movedRecently&&holdT>=0.15){
+        const interval=holdT<1.5?0.08:0.12;
+        if(lastBirthT===0||ts-lastBirthT>=interval*1000){
+          const spFactor=holdT<1.5?(0.25+(holdT/1.5)*0.65):0.9;
+          const spread=baseSp*spFactor;
+          const ang=Math.random()*Math.PI*2;
+          const r=spread*(0.3+Math.random()*0.7);
+          const cx=px+Math.cos(ang)*r,cy=py+Math.sin(ang)*r;
+          injectCloudEvent(cx,cy,{count:holdT<1.5?2:3,spread});
+          lastBirthT=ts;holdDist=0;
+        }
+      }else if(movedRecently&&holdDist>=triggerDist){
+        const spread=baseSp*0.35;
+        const ang=Math.random()*Math.PI*2;
+        const r=spread*(0.2+Math.random()*0.6);
+        const cx=px+Math.cos(ang)*r,cy=py+Math.sin(ang)*r;
+        injectCloudEvent(cx,cy,{count:2,spread});
+        holdDist=0;lastBirthT=ts;
+      }
+    }
     const deadGids=new Set();
     const bMul=viewScale;
     for(let gi=cloudGroups.length-1;gi>=0;gi--){
