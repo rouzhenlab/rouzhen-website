@@ -2,10 +2,11 @@
   'use strict';
   const canvas = document.getElementById('mainCanvas');
   const ctx = canvas.getContext('2d');
-  let viewW = 0, viewH = 0, dpr = Math.max(1, window.devicePixelRatio || 1);
+  let viewW = 0, viewH = 0, dpr = Math.max(1, window.devicePixelRatio || 1), viewScale = 1;
   function resizeCanvas() {
     const w = window.innerWidth, h = window.innerHeight;
     viewW = w; viewH = h;
+    viewScale = Math.min(w, h) / 1080;
     canvas.width = Math.floor(w * dpr); canvas.height = Math.floor(h * dpr);
     canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -132,22 +133,22 @@
     };
     cloudGroups.push(grp);
     groupById.set(gid,grp);
+    const baseMul = viewScale * sb;
     for (let i=0;i<n;i++){
       const t1=rnd(),t2=rnd(),r=Math.sqrt(t1)*sp,th=t2*Math.PI*2,dx=Math.cos(th)*r,dy=Math.sin(th)*r;
       const sdensity = gauss(r,sp*0.55), x=cx+dx, y=cy+dy;
-      const bs=(CC.blobScaleBase+rnd()*CC.blobScaleSpan)*sb, ba=(CC.baseAlphaMin+rnd()*CC.baseAlphaSpan)*(0.5+sdensity*0.5);
-      samplingPoints.push({groupId:gid,relX:dx,relY:dy,x,y,rot:rnd()*Math.PI*2,rotSpeed:(rnd()-0.5)*0.004,scale:bs,curScale:bs,baseAlpha:ba,alpha:ba,density:sdensity,tex:INK_TEXTURES[(seed+i)%8],depth:rnd(),stretchAmount:0,stretchAngle:0,breathSeed:rnd()*Math.PI*2,breathFreq:0.3+rnd()*0.8,squishY:0.78+rnd()*0.42,birthFrame:globalFrameCounter});
+      const rScale=rnd(), rAlpha=rnd();
+      const bs=(CC.blobScaleBase+rScale*CC.blobScaleSpan)*baseMul, ba=(CC.baseAlphaMin+rAlpha*CC.baseAlphaSpan)*(0.5+sdensity*0.5);
+      samplingPoints.push({groupId:gid,relX:dx,relY:dy,x,y,rot:rnd()*Math.PI*2,rotSpeed:(rnd()-0.5)*0.004,scale:bs,curScale:bs,baseAlpha:ba,density:sdensity,tex:INK_TEXTURES[(seed+i)%8],depth:rnd(),stretchAmount:0,stretchAngle:0,breathSeed:rnd()*Math.PI*2,breathFreq:0.3+rnd()*0.8,squishY:0.78+rnd()*0.42,birthFrame:globalFrameCounter,rScale,rAlpha,_baseMul:baseMul});
     }
     while(samplingPoints.length>MAX_COUNT_HARD){const i=((globalFrameCounter*13)>>>0)%samplingPoints.length;releaseSamplingPoint(i);}
   }
-  let relT=0;
-  function autoRelTick(){}
-  let px=0,py=0,pvx=0,pvy=0,down=false,holdT=0;
+  let px=0,py=0,pvx=0,pvy=0,down=false;
   let clickWarmup=0;
   let interactionMode='cloud';
   function getPos(e){const r=canvas.getBoundingClientRect();let cx,cy;if(e.touches&&e.touches[0]){cx=e.touches[0].clientX;cy=e.touches[0].clientY;}else{cx=e.clientX;cy=e.clientY;}return{x:(cx-r.left)*(canvas.width/dpr)/r.width,y:(cy-r.top)*(canvas.height/dpr)/r.height};}
-  function pd(e){e.preventDefault();const p=getPos(e);px=p.x;py=p.y;pvx=pvy=0;down=true;holdT=0;clickWarmup=5;if(expM===4&&stF===-1)stF=globalFrameCounter;if(interactionMode==='cloud')injectCloudEvent(px,py,{count:CC.clickCount,spread:CC.clickSpread});}
-  function pm(e){e.preventDefault();const p=getPos(e);const ox=px,oy=py;px=p.x;py=p.y;const dx=px-ox,dy=py-oy;const maxStep=8;const step=Math.hypot(dx,dy);if(step>maxStep){const k=maxStep/step;pvx=0.6*pvx+0.4*dx*k;pvy=0.6*pvy+0.4*dy*k;}else{pvx=0.6*pvx+0.4*dx;pvy=0.6*pvy+0.4*dy;}if(down){if(expM===4&&stF===-1)stF=globalFrameCounter;const wp=clickWarmup>0?Math.max(0,1-clickWarmup/5):1;const wa=Math.min(1.2,Math.hypot(pvx,pvy)*0.08)*wp;if(wa>0.04)depositWake(px,py,pvx*0.04,pvy*0.04,wa);const pushR=CC.pushRadius,pushR2=pushR*pushR,pushMag=Math.min(CC.pushMagMax,Math.hypot(pvx,pvy)*CC.pushMagCoef)*wp;if(pushMag>0.0015){for(const grp of cloudGroups){const dxg=grp.cx-px,dyg=grp.cy-py,d2=dxg*dxg+dyg*dyg;if(d2>pushR2)continue;const d=Math.sqrt(d2)+1e-4,f=1-d/pushR,p=f*f;grp.vx+=pvx*pushMag*p;grp.vy+=pvy*pushMag*p;}}}}
+  function pd(e){e.preventDefault();const p=getPos(e);px=p.x;py=p.y;pvx=pvy=0;down=true;clickWarmup=5;if(expM===4&&stF===-1)stF=globalFrameCounter;if(interactionMode==='cloud')injectCloudEvent(px,py,{count:CC.clickCount,spread:CC.clickSpread*viewScale});}
+  function pm(e){e.preventDefault();const p=getPos(e);const ox=px,oy=py;px=p.x;py=p.y;const dx=px-ox,dy=py-oy;const maxStep=8;const step=Math.hypot(dx,dy);if(step>maxStep){const k=maxStep/step;pvx=0.6*pvx+0.4*dx*k;pvy=0.6*pvy+0.4*dy*k;}else{pvx=0.6*pvx+0.4*dx;pvy=0.6*pvy+0.4*dy;}if(down){if(expM===4&&stF===-1)stF=globalFrameCounter;const wp=clickWarmup>0?Math.max(0,1-clickWarmup/5):1;const wa=Math.min(1.2,Math.hypot(pvx,pvy)*0.08)*wp;if(wa>0.04)depositWake(px,py,pvx*0.04,pvy*0.04,wa);const pushR=CC.pushRadius*viewScale,pushR2=pushR*pushR,pushMag=Math.min(CC.pushMagMax,Math.hypot(pvx,pvy)*CC.pushMagCoef)*wp;if(pushMag>0.0015){for(const grp of cloudGroups){const dxg=grp.cx-px,dyg=grp.cy-py,d2=dxg*dxg+dyg*dyg;if(d2>pushR2)continue;const d=Math.sqrt(d2)+1e-4,f=1-d/pushR,p=f*f;grp.vx+=pvx*pushMag*p;grp.vy+=pvy*pushMag*p;}}}}
   function pu(){down=false;}
   canvas.addEventListener('mousedown',pd);window.addEventListener('mousemove',pm);window.addEventListener('mouseup',pu);
   canvas.addEventListener('touchstart',pd,{passive:false});canvas.addEventListener('touchmove',pm,{passive:false});canvas.addEventListener('touchend',pu);
@@ -275,6 +276,7 @@
     if(!down){pvx*=0.9;pvy*=0.9;}
     if(clickWarmup>0)clickWarmup=Math.max(0,clickWarmup-dF);
     const deadGids=new Set();
+    const bMul=viewScale;
     for(let gi=cloudGroups.length-1;gi>=0;gi--){
       const gr=cloudGroups[gi];
       const gg=sVG(gr.cx,gr.cy,0.5,0.5);
@@ -303,8 +305,10 @@
       s.stretchAmount=0;
       const gvl=Math.hypot(grp.vx,grp.vy);
       if(gvl>0.02)s.stretchAngle=Math.atan2(grp.vy,grp.vx);
+      s.curScale=(CC.blobScaleBase+s.rScale*CC.blobScaleSpan)*bMul;
       const effDen=grp.densityFactor*s.density;
       const dFade=effDen<0.05?effDen/0.05:1;
+      s.baseAlpha=(CC.baseAlphaMin+s.rAlpha*CC.baseAlphaSpan)*(0.5+effDen*0.5);
       s.alpha=s.baseAlpha*dFade*(1+Math.sin((s.x*0.00019+s.y*0.00021)+s.breathSeed+cT*s.breathFreq)*0.12);
     }
     lE();
@@ -332,7 +336,7 @@
       ctx.restore();
     }
   }
-  window.__dbg={samplingPoints,canvas,sCurl,sWind,sV,sVG,fC,expM,CC};
+  window.__dbg={samplingPoints,canvas,sCurl,sWind,sV,sVG,fC,expM,CC,viewScale:()=>viewScale};
   function takeScreenshot(){
     const s=new Date(),y=s.getFullYear(),m=String(s.getMonth()+1).padStart(2,'0'),d=String(s.getDate()).padStart(2,'0'),
       h=String(s.getHours()).padStart(2,'0'),mi=String(s.getMinutes()).padStart(2,'0'),se=String(s.getSeconds()).padStart(2,'0'),
