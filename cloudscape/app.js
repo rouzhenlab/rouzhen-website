@@ -80,7 +80,7 @@
     fieldVelMul: 0.800,
     pushRadius: 160, pushMagMax: 0.910, pushMagCoef: 0.155,
     wakeStrength: 1.000,
-    passiveDecay: 0.015,
+    passiveDecay: 0.001,
     densityDieAt: 0.005
   };
   let curlNoiseSeeds = []; for (let i=0;i<24;i++) curlNoiseSeeds.push(Math.random()*1000);
