@@ -14,6 +14,9 @@
   window.addEventListener('resize', resizeCanvas);
   const TARGET_COUNT = 620, MAX_COUNT_HARD = 1800, MAX_SCALE_SPAN = 0.27;
   const samplingPoints = [];
+  const cloudGroups = [];
+  const groupById = new Map();
+  let nextGroupId = 0;
   function makeInkTexture(seed) {
     const SZ = 256;
     const cc = document.createElement('canvas'); cc.width = SZ; cc.height = SZ;
@@ -109,11 +112,19 @@
     const gvy=hasInject?injectVy:Math.sin(groupAng)*groupSpd;
     const groupDriftAng=hasInject?Math.atan2(injectVy,injectVx):groupAng;
     const groupDriftSpd=hasInject?Math.hypot(injectVx,injectVy)*0.6:groupSpd*0.6;
+    const gid = nextGroupId++;
+    const grp={
+      id:gid,cx,cy,vx:gvx,vy:gvy,
+      driftAng:groupDriftAng,driftSpd:groupDriftSpd,
+      birthFrame:globalFrameCounter,count:n
+    };
+    cloudGroups.push(grp);
+    groupById.set(gid,grp);
     for (let i=0;i<n;i++){
       const t1=rnd(),t2=rnd(),r=Math.sqrt(t1)*sp,th=t2*Math.PI*2,dx=Math.cos(th)*r,dy=Math.sin(th)*r;
-      const density = gauss(r,sp*0.55), x=cx+dx, y=cy+dy;
-      const bs=(0.05+rnd()*MAX_SCALE_SPAN)*sb, ba=(0.06+rnd()*0.10)*(0.3+density*0.7);
-      samplingPoints.push({x,y,vx:gvx+(rnd()-0.5)*0.01,vy:gvy+(rnd()-0.5)*0.01,selfDrift:groupDriftAng,selfDriftSpd:groupDriftSpd,rot:rnd()*Math.PI*2,rotSpeed:(rnd()-0.5)*0.004,scale:bs,curScale:bs,baseAlpha:ba,alpha:ba,density,tex:INK_TEXTURES[(seed+i)%8],depth:rnd(),stretchAmount:0,stretchAngle:0,breathSeed:rnd()*Math.PI*2,breathFreq:0.3+rnd()*0.8,squishY:0.78+rnd()*0.42,birthFrame:globalFrameCounter});
+      const sdensity = gauss(r,sp*0.55), x=cx+dx, y=cy+dy;
+      const bs=(0.05+rnd()*MAX_SCALE_SPAN)*sb, ba=(0.18+rnd()*0.28)*(0.5+sdensity*0.5);
+      samplingPoints.push({groupId:gid,relX:dx,relY:dy,x,y,rot:rnd()*Math.PI*2,rotSpeed:(rnd()-0.5)*0.004,scale:bs,curScale:bs,baseAlpha:ba,alpha:ba,density:sdensity,tex:INK_TEXTURES[(seed+i)%8],depth:rnd(),stretchAmount:0,stretchAngle:0,breathSeed:rnd()*Math.PI*2,breathFreq:0.3+rnd()*0.8,squishY:0.78+rnd()*0.42,birthFrame:globalFrameCounter});
     }
     while(samplingPoints.length>MAX_COUNT_HARD){const i=((globalFrameCounter*13)>>>0)%samplingPoints.length;releaseSamplingPoint(i);}
   }
@@ -124,7 +135,7 @@
   let interactionMode='cloud';
   function getPos(e){const r=canvas.getBoundingClientRect();let cx,cy;if(e.touches&&e.touches[0]){cx=e.touches[0].clientX;cy=e.touches[0].clientY;}else{cx=e.clientX;cy=e.clientY;}return{x:(cx-r.left)*(canvas.width/dpr)/r.width,y:(cy-r.top)*(canvas.height/dpr)/r.height};}
   function pd(e){e.preventDefault();const p=getPos(e);px=p.x;py=p.y;pvx=pvy=0;down=true;holdT=0;clickWarmup=5;if(expM===4&&stF===-1)stF=globalFrameCounter;if(interactionMode==='cloud')injectCloudEvent(px,py,{count:5});}
-  function pm(e){e.preventDefault();const p=getPos(e);const ox=px,oy=py;px=p.x;py=p.y;const dx=px-ox,dy=py-oy;const maxStep=8;const step=Math.hypot(dx,dy);if(step>maxStep){const k=maxStep/step;pvx=0.6*pvx+0.4*dx*k;pvy=0.6*pvy+0.4*dy*k;}else{pvx=0.6*pvx+0.4*dx;pvy=0.6*pvy+0.4*dy;}if(down){if(expM===4&&stF===-1)stF=globalFrameCounter;const wp=clickWarmup>0?Math.max(0,1-clickWarmup/5):1;const wa=Math.min(1.2,Math.hypot(pvx,pvy)*0.08)*wp;if(wa>0.04)depositWake(px,py,pvx*0.04,pvy*0.04,wa);}}
+  function pm(e){e.preventDefault();const p=getPos(e);const ox=px,oy=py;px=p.x;py=p.y;const dx=px-ox,dy=py-oy;const maxStep=8;const step=Math.hypot(dx,dy);if(step>maxStep){const k=maxStep/step;pvx=0.6*pvx+0.4*dx*k;pvy=0.6*pvy+0.4*dy*k;}else{pvx=0.6*pvx+0.4*dx;pvy=0.6*pvy+0.4*dy;}if(down){if(expM===4&&stF===-1)stF=globalFrameCounter;const wp=clickWarmup>0?Math.max(0,1-clickWarmup/5):1;const wa=Math.min(1.2,Math.hypot(pvx,pvy)*0.08)*wp;if(wa>0.04)depositWake(px,py,pvx*0.04,pvy*0.04,wa);const pushR=160,pushR2=pushR*pushR,pushMag=Math.min(0.1,Math.hypot(pvx,pvy)*0.025)*wp;if(pushMag>0.0015){for(const grp of cloudGroups){const dxg=grp.cx-px,dyg=grp.cy-py,d2=dxg*dxg+dyg*dyg;if(d2>pushR2)continue;const d=Math.sqrt(d2)+1e-4,f=1-d/pushR,p=f*f;grp.vx+=pvx*pushMag*p;grp.vy+=pvy*pushMag*p;}}}}
   function pu(){down=false;}
   canvas.addEventListener('mousedown',pd);window.addEventListener('mousemove',pm);window.addEventListener('mouseup',pu);
   canvas.addEventListener('touchstart',pd,{passive:false});canvas.addEventListener('touchmove',pm,{passive:false});canvas.addEventListener('touchend',pu);
@@ -148,7 +159,7 @@
   function aDen(){if(!samplingPoints.length)return 0;let s=0;for(const p of samplingPoints)s+=p.density;return s/samplingPoints.length}
   function aGr(){if(!samplingPoints.length)return{ad:0,as:0,ag:0};let d=0,sh=0,c=0;for(const s of samplingPoints){const sf=Math.min(1,Math.max(0,(s.curScale-0.05)/MAX_SCALE_SPAN));const g=sVG(s.x,s.y,sf,s.depth);d+=g.divergence;sh+=g.shear;c++}return{ad:d/c,as:sh/c,ag:(Math.abs(d)+sh)/c}}
   function aWk(){if(!samplingPoints.length)return 0;let s=0;for(const p of samplingPoints){const w=sampleWake(p.x,p.y);s+=Math.hypot(w.x,w.y)}return s/samplingPoints.length}
-  function startE(m){expM=m;expF=0;baseDen=0;samplingPoints.length=0;fC={...defC,windAmp:0,curlAmp:0,wakeActive:false,impulseActive:false};stF=-1;dSub=0;dLog=[];const cx=viewW*0.5,cy=viewH*0.5;if(m===1){injectCloudEvent(cx,cy,{count:14,spread:80})}else if(m===2){injectCloudEvent(cx,cy,{count:14,spread:80});for(const p of samplingPoints)p.vx+=0.3;}else if(m===3){injectCloudEvent(cx,cy,{count:18,spread:80});for(const p of samplingPoints)p.vy+=0.003*(p.x-cx);}else if(m===4){injectCloudEvent(cx,cy,{count:20,spread:110})}}
+  function startE(m){expM=m;expF=0;baseDen=0;samplingPoints.length=0;cloudGroups.length=0;groupById.clear();fC={...defC,windAmp:0,curlAmp:0,wakeActive:false,impulseActive:false};stF=-1;dSub=0;dLog=[];const cx=viewW*0.5,cy=viewH*0.5;if(m===1){injectCloudEvent(cx,cy,{count:14,spread:80})}else if(m===2){injectCloudEvent(cx,cy,{count:14,spread:80});for(const gr of cloudGroups){gr.vx+=0.3;}}else if(m===3){injectCloudEvent(cx,cy,{count:18,spread:80});for(const gr of cloudGroups){gr.vy+=0.003*(gr.cx-cx);}}else if(m===4){injectCloudEvent(cx,cy,{count:20,spread:110})}}
   let stF=-1,dSub=0,dLog=[];
   function sD(m){if(expM!==4)startE(4);if(m===1){fC.wakeActive=true;fC.impulseActive=false;}else if(m===2){fC.wakeActive=false;fC.impulseActive=true;}else{fC.wakeActive=true;fC.impulseActive=true;}dSub=m;stF=-1;dLog=[]}
   function cD(){
@@ -185,11 +196,11 @@
         if(wo&&di>0.5)depositWake(x,y,pvx0*0.04,pvy0*0.04,1.0);
         if(io&&di>0.5){
           const r2=fC.impulseR*fC.impulseR,R=fC.impulseR,im=fC.impulseMag;
-          for(let i=0;i<samplingPoints.length;i++){
-            const s=samplingPoints[i],dx=s.x-x,dy=s.y-y,d2=dx*dx+dy*dy;
+          for(const gr of cloudGroups){
+            const dx=gr.cx-x,dy=gr.cy-y,d2=dx*dx+dy*dy;
             if(d2>r2)continue;
             const d=Math.sqrt(d2)+1e-4,f=1-d/R,p=f*f;
-            s.vx+=pvx0*im*p;s.vy+=pvy0*im*p;
+            gr.vx+=pvx0*im*p;gr.vy+=pvy0*im*p;
           }
         }
         if((step-NB)%2===0){
@@ -249,22 +260,33 @@
     stepWake(dF);
     if(!down){pvx*=0.9;pvy*=0.9;}
     if(clickWarmup>0)clickWarmup=Math.max(0,clickWarmup-dF);
+    const deadGids=new Set();
+    for(let gi=cloudGroups.length-1;gi>=0;gi--){
+      const gr=cloudGroups[gi];
+      const gg=sVG(gr.cx,gr.cy,0.5,0.5);
+      const dp=Math.pow(0.985,dF);
+      gr.driftAng+=(Math.random()-0.5)*0.04;
+      const sdx=Math.cos(gr.driftAng)*gr.driftSpd*0.35;
+      const sdy=Math.sin(gr.driftAng)*gr.driftSpd*0.35;
+      gr.vx=gr.vx*dp+(gg.vx*0.35+sdx)*dF;
+      gr.vy=gr.vy*dp+(gg.vy*0.35+sdy)*dF;
+      const mv=0.12,vl=Math.hypot(gr.vx,gr.vy);
+      if(vl>mv){gr.vx=gr.vx/vl*mv;gr.vy=gr.vy/vl*mv;}
+      gr.cx+=gr.vx*dF;gr.cy+=gr.vy*dF;
+      if(gr.cx<-300||gr.cx>viewW+300||gr.cy<-300||gr.cy>viewH+300){deadGids.add(gr.id);groupById.delete(gr.id);cloudGroups.splice(gi,1);}
+    }
     for(let i=samplingPoints.length-1;i>=0;i--){
       const s=samplingPoints[i];
+      if(deadGids.has(s.groupId)){releaseSamplingPoint(i);continue;}
+      const grp=groupById.get(s.groupId);
+      if(!grp){releaseSamplingPoint(i);continue;}
+      s.x=grp.cx+s.relX;s.y=grp.cy+s.relY;
       const sf=Math.min(1,Math.max(0,(s.curScale-0.05)/0.22));
       const g=sVG(s.x,s.y,sf,s.depth);
-      const dp=Math.pow(0.985,dF);
-      s.selfDrift+=(Math.random()-0.5)*0.12;
-      const sdx=Math.cos(s.selfDrift)*s.selfDriftSpd*0.35;
-      const sdy=Math.sin(s.selfDrift)*s.selfDriftSpd*0.35;
-      s.vx=s.vx*dp+(g.vx*0.35+sdx)*dF;
-      s.vy=s.vy*dp+(g.vy*0.35+sdy)*dF;
-      const mv=0.1,vl=Math.hypot(s.vx,s.vy);
-      if(vl>mv){s.vx=s.vx/vl*mv;s.vy=s.vy/vl*mv;}
-      s.x+=s.vx*dF;s.y+=s.vy*dF;
       s.rot+=s.rotSpeed*dF;
       s.stretchAmount=Math.min(0.5,g.shear*55);
-      if(vl>0.02)s.stretchAngle=Math.atan2(s.vy,s.vx);
+      const gvl=Math.hypot(grp.vx,grp.vy);
+      if(gvl>0.02)s.stretchAngle=Math.atan2(grp.vy,grp.vx);
       const dl=Math.max(0,g.divergence)*DIV_LOSS_SCALE;
       const sl=Math.min(SHEAR_LOSS_CAP,g.shear*SHEAR_LOSS_SCALE);
       const tl=Math.min(TOTAL_LOSS_CAP,dl+sl);
@@ -317,7 +339,7 @@
   const bgUploader=document.getElementById('bgUploader');
   if(bgUploader)bgUploader.addEventListener('change',(e)=>{const f=e.target.files[0];if(!f)return;const url=URL.createObjectURL(f);const img=new Image();img.onload=()=>{const sc=Math.min(viewW/img.naturalWidth,viewH/img.naturalHeight)*0.92;window._bgSet({url,scale:sc,dx:0,dy:0});};img.src=url;});
   const clearBtn=document.getElementById('clearBtn');
-  if(clearBtn)clearBtn.addEventListener('click',()=>{samplingPoints.length=0;});
+  if(clearBtn)clearBtn.addEventListener('click',()=>{samplingPoints.length=0;cloudGroups.length=0;groupById.clear();});
   const snapBtn=document.getElementById('snapBtn');
   if(snapBtn)snapBtn.addEventListener('click',takeScreenshot);
   resizeCanvas();lTS=performance.now();
