@@ -307,20 +307,43 @@
     dC(samplingPoints);
     ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
   }
+  let bufCanvas=null, bufCtx=null;
+  function ensureBuf(){
+    if(!bufCanvas){bufCanvas=document.createElement('canvas');bufCtx=bufCanvas.getContext('2d');}
+    const w=Math.max(1,Math.floor(viewW*dpr)), h=Math.max(1,Math.floor(viewH*dpr));
+    if(bufCanvas.width!==w||bufCanvas.height!==h){bufCanvas.width=w;bufCanvas.height=h;}
+  }
   function dC(list){
-    ctx.globalCompositeOperation='screen';
+    ensureBuf();
+    bufCtx.setTransform(dpr,0,0,dpr,0,0);
+    bufCtx.clearRect(0,0,viewW,viewH);
+    bufCtx.globalCompositeOperation='screen';
     for(let i=0;i<list.length;i++){
       const s=list[i];
       if(s.alpha<0.0003)continue;
       const tw=s.tex.width*s.curScale,th=s.tex.height*s.curScale*s.squishY;
-      ctx.save();
-      ctx.translate(s.x,s.y);
-      if(s.stretchAmount>0.01){ctx.rotate(s.stretchAngle);ctx.scale(1+s.stretchAmount,1-s.stretchAmount*0.3);}
-      else ctx.rotate(s.rot);
-      ctx.globalAlpha=s.alpha;
-      ctx.drawImage(s.tex,-tw/2,-th/2,tw,th);
-      ctx.restore();
+      bufCtx.save();
+      bufCtx.translate(s.x,s.y);
+      if(s.stretchAmount>0.01){bufCtx.rotate(s.stretchAngle);bufCtx.scale(1+s.stretchAmount,1-s.stretchAmount*0.3);}
+      else bufCtx.rotate(s.rot);
+      bufCtx.globalAlpha=s.alpha;
+      bufCtx.drawImage(s.tex,-tw/2,-th/2,tw,th);
+      bufCtx.restore();
     }
+    // Fusion pass: merge discrete particle blobs into a continuous mass.
+    // Wide, low-alpha blur closes the gaps between nearby particles;
+    // a second, narrower blur pass on top preserves internal density
+    // variation so the result isn't a flat, featureless haze.
+    ctx.save();
+    ctx.setTransform(1,0,0,1,0,0);
+    ctx.globalCompositeOperation='screen';
+    ctx.filter=`blur(${(14*dpr).toFixed(1)}px)`;
+    ctx.globalAlpha=0.55;
+    ctx.drawImage(bufCanvas,0,0);
+    ctx.filter=`blur(${(3*dpr).toFixed(1)}px)`;
+    ctx.globalAlpha=1;
+    ctx.drawImage(bufCanvas,0,0);
+    ctx.restore();
   }
   window.__dbg={samplingPoints,canvas,sCurl,sWind,sV,sVG,fC,expM};
   function takeScreenshot(){
