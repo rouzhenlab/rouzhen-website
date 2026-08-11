@@ -79,3 +79,90 @@ body, html {
   align-items: center;
   justify-content: center;
 }
+
+.tune-panel {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 320px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: rgba(11, 13, 12, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  z-index: 20;
+  display: none;
+  font-size: 0.8rem;
+}
+.tune-panel.open { display: block; }
+.tune-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+.tune-close {
+  background: none; border: none; color: #8b938f;
+  font-size: 1.3rem; cursor: pointer; line-height: 1;
+}
+.tune-close:hover { color: #f0f2ef; }
+.tune-body { padding: 0.5rem 1rem 1rem; }
+.tune-group {
+  margin-top: 0.8rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.tune-group:first-child { border-top: none; margin-top: 0; }
+.tune-group-title {
+  font-size: 0.7rem;
+  color: #6b736f;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.5rem;
+}
+.tune-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+.tune-row label {
+  flex: 0 0 90px;
+  font-size: 0.75rem;
+  color: #b0b8b4;
+}
+.tune-row input[type="range"] {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  outline: none;
+}
+.tune-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #f0f2ef;
+  cursor: pointer;
+}
+.tune-row input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #f0f2ef;
+  cursor: pointer;
+  border: none;
+}
+.tune-val {
+  flex: 0 0 48px;
+  text-align: right;
+  font-size: 0.72rem;
+  color: #d0d8d4;
+  font-family: monospace;
+}

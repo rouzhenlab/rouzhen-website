@@ -11,6 +11,7 @@
     canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     rebuildWakeGrid();
+    if(!_userHasInteracted) spawnPresetClouds(false);
   }
   window.addEventListener('resize', resizeCanvas);
   const TARGET_COUNT = 620, MAX_COUNT_HARD = 1800, MAX_SCALE_SPAN = 0.27;
@@ -68,6 +69,54 @@
   const INK_TEXTURES = []; for (let i = 0; i < 8; i++) INK_TEXTURES.push(makeInkTexture(i));
   const bgImg = new Image(); let bgScale=1, bgX=0, bgY=0;
   window._bgSet = ({url,scale,dx,dy})=>{ if(url)bgImg.src=url; if(scale!=null)bgScale=scale; if(dx!=null)bgX=dx; if(dy!=null)bgY=dy; };
+  let _userHasInteracted = false, _emptyFrames = 0;
+  function spawnPresetClouds(skipResizeCheck){
+    const vs = viewScale;
+    const baseSp = CC.clickSpread * vs;
+    if(_userHasInteracted && !skipResizeCheck) return;
+    samplingPoints.length = 0;
+    cloudGroups.length = 0;
+    groupById.clear();
+    // ── 预制云：6 朵，每朵一个 {x,y,c,sm,vx,vy} ──
+    //   x, y : 屏幕位置 (0~1，0=左/顶，1=右/底)
+    //     c  : 墨点数量 (越多越浓密 → 越实)
+    //     sm : 扩散半径倍数 (CC.clickSpread=34 * sm = 散布范围，越大越散)
+    //     vx,vy : 初始漂移速度 (正=右/下，负=左/上)
+    const puffs = [
+      {x:0.18,y:0.10,c:18,sm:1.5,vx:0.008,vy:-0.004},  // 上-左
+      {x:0.35,y:0.30,c:7, sm:1.3,vx:-0.006,vy:-0.003}, // 上-中
+      {x:0.68,y:0.20,c:12,sm:1.1,vx:-0.005,vy:-0.001}, // 上-右
+      {x:0.23,y:0.54,c:7, sm:2.2,vx:0.005,vy:-0.012},  // 下-左
+      {x:0.39,y:0.60,c:5, sm:1.9,vx:0.003,vy:-0.010},  // 下-中
+      {x:0.46,y:0.52,c:10,sm:1.7,vx:-0.002,vy:-0.009}, // 下-右
+    ];
+    for(const p of puffs){
+      const cx = viewW * p.x, cy = viewH * p.y, spread = baseSp * p.sm;
+      injectCloudEvent(cx,cy,{count:p.c,spread,vx:p.vx,vy:p.vy,
+        preset:true,
+        // ── 以下只对预制云生效，不影响点击云 ──
+        //   最终墨团缩放 = (presetBlobScaleBase + 随机×presetBlobScaleSpan) × viewScale
+        //   值越大墨团越大。默认点击云：0.19 + 随机×0.24 = 0.19~0.43
+        presetBlobScaleBase:0.35, presetBlobScaleSpan:0.20,
+        //   最终透明度 = (presetAlphaMin + 随机×presetAlphaSpan) × 密度系数
+        //   值越大越不透明。默认点击云：0.06~0.11（几乎不可见）
+        presetAlphaMin:0.40, presetAlphaSpan:0.15,
+        //   squishY 控制扁度：值越小越扁 (宽>高)
+        //   默认 0.78~1.20 (随机；0.78=微扁，1.0=正圆，>1.0=竖长)
+        //   预制云设为 0.55~0.75 → 明显宽扁，若太扁显棱角可调高
+        presetSquishYMin:0.55, presetSquishYSpan:0.20,
+      });
+    }
+  }
+  function loadDefaultHero(){
+    const img = new Image();
+    img.onload = ()=>{
+      const nsc = Math.min(viewW/img.naturalWidth, viewH/img.naturalHeight) * 1.15;
+      window._bgSet({url:'hero_original.jpg', scale:nsc, dx:0, dy:0});
+      spawnPresetClouds(true);
+    };
+    img.src = 'hero_original.jpg';
+  }
   const WAKE_CELL = 36;
   const DIV_LOSS_SCALE = 1.5, SHEAR_LOSS_SCALE = 0.33, SHEAR_LOSS_CAP = 0.013, TOTAL_LOSS_CAP = 0.018;
   const CC = {
@@ -80,7 +129,7 @@
     fieldVelMul: 0.800,
     pushRadius: 160, pushMagMax: 0.910, pushMagCoef: 0.155,
     wakeStrength: 1.000,
-    passiveDecay: 0.000,
+    passiveDecay: 0.001,
     densityDieAt: 0.005
   };
   let curlNoiseSeeds = []; for (let i=0;i<24;i++) curlNoiseSeeds.push(Math.random()*1000);
@@ -131,6 +180,7 @@
       driftAng:groupDriftAng,driftSpd:groupDriftSpd,
       birthFrame:globalFrameCounter,count:n
     };
+    if(opt?.preset) grp._preset = true;
     cloudGroups.push(grp);
     groupById.set(gid,grp);
     const baseMul = viewScale * sb;
@@ -139,7 +189,11 @@
       const sdensity = gauss(r,sp*0.55), x=cx+dx, y=cy+dy;
       const rScale=rnd(), rAlpha=rnd();
       const bs=(CC.blobScaleBase+rScale*CC.blobScaleSpan)*baseMul, ba=(CC.baseAlphaMin+rAlpha*CC.baseAlphaSpan)*(0.5+sdensity*0.5);
-      samplingPoints.push({groupId:gid,relX:dx,relY:dy,x,y,rot:rnd()*Math.PI*2,rotSpeed:(rnd()-0.5)*0.004,scale:bs,curScale:bs,baseAlpha:ba,density:sdensity,tex:INK_TEXTURES[(seed+i)%8],depth:rnd(),stretchAmount:0,stretchAngle:0,breathSeed:rnd()*Math.PI*2,breathFreq:0.3+rnd()*0.8,squishY:0.78+rnd()*0.42,birthFrame:globalFrameCounter,rScale,rAlpha,_baseMul:baseMul});
+      samplingPoints.push({groupId:gid,relX:dx,relY:dy,x,y,rot:rnd()*Math.PI*2,rotSpeed:(rnd()-0.5)*0.004,scale:bs,curScale:bs,baseAlpha:ba,density:sdensity,tex:INK_TEXTURES[(seed+i)%8],depth:rnd(),stretchAmount:0,stretchAngle:0,breathSeed:rnd()*Math.PI*2,breathFreq:0.3+rnd()*0.8,squishY:0.78+rnd()*0.42,birthFrame:globalFrameCounter,rScale,rAlpha,_baseMul:baseMul,
+        _presetScaleBase:(opt?.preset?((opt.presetBlobScaleBase??0.35)+rScale*(opt.presetBlobScaleSpan??0.20)):undefined),
+        _presetAlphaBase:(opt?.preset?((opt.presetAlphaMin??0.40)+rAlpha*(opt.presetAlphaSpan??0.15)):undefined),
+        _presetSquishY:(opt?.preset?(opt.presetSquishYMin??0.35)+rnd()*(opt.presetSquishYSpan??0.20):undefined)
+      });
     }
     while(samplingPoints.length>MAX_COUNT_HARD){const i=((globalFrameCounter*13)>>>0)%samplingPoints.length;releaseSamplingPoint(i);}
   }
@@ -148,7 +202,7 @@
   let holdT=0,holdDist=0,lastBirthT=0,lastHoldMoveT=0;
   let interactionMode='cloud';
   function getPos(e){const r=canvas.getBoundingClientRect();let cx,cy;if(e.touches&&e.touches[0]){cx=e.touches[0].clientX;cy=e.touches[0].clientY;}else{cx=e.clientX;cy=e.clientY;}return{x:(cx-r.left)*(canvas.width/dpr)/r.width,y:(cy-r.top)*(canvas.height/dpr)/r.height};}
-  function pd(e){e.preventDefault();const p=getPos(e);px=p.x;py=p.y;pvx=pvy=0;down=true;clickWarmup=5;holdT=0;holdDist=0;lastBirthT=0;lastHoldMoveT=0;if(expM===4&&stF===-1)stF=globalFrameCounter;if(interactionMode==='cloud')injectCloudEvent(px,py,{count:CC.clickCount,spread:CC.clickSpread*viewScale});}
+  function pd(e){e.preventDefault();_userHasInteracted=true;const p=getPos(e);px=p.x;py=p.y;pvx=pvy=0;down=true;clickWarmup=5;holdT=0;holdDist=0;lastBirthT=0;lastHoldMoveT=0;if(expM===4&&stF===-1)stF=globalFrameCounter;injectCloudEvent(px,py,{count:CC.clickCount,spread:CC.clickSpread*viewScale});}
   function pm(e){e.preventDefault();const p=getPos(e);const ox=px,oy=py;px=p.x;py=p.y;const dx=px-ox,dy=py-oy;const maxStep=8;const step=Math.hypot(dx,dy);if(step>maxStep){const k=maxStep/step;pvx=0.6*pvx+0.4*dx*k;pvy=0.6*pvy+0.4*dy*k;}else{pvx=0.6*pvx+0.4*dx;pvy=0.6*pvy+0.4*dy;}if(down){holdDist+=Math.hypot(px-ox,py-oy);lastHoldMoveT=0;if(expM===4&&stF===-1)stF=globalFrameCounter;const wp=clickWarmup>0?Math.max(0,1-clickWarmup/5):1;const wa=Math.min(1.2,Math.hypot(pvx,pvy)*0.08)*wp;if(wa>0.04)depositWake(px,py,pvx*0.04,pvy*0.04,wa);const pushR=CC.pushRadius*viewScale,pushR2=pushR*pushR,pushMag=Math.min(CC.pushMagMax,Math.hypot(pvx,pvy)*CC.pushMagCoef)*wp;if(pushMag>0.0015){for(const grp of cloudGroups){const dxg=grp.cx-px,dyg=grp.cy-py,d2=dxg*dxg+dyg*dyg;if(d2>pushR2)continue;const d=Math.sqrt(d2)+1e-4,f=1-d/pushR,p=f*f;grp.vx+=pvx*pushMag*p;grp.vy+=pvy*pushMag*p;}}}}
   function pu(){down=false;holdT=0;holdDist=0;lastBirthT=0;lastHoldMoveT=0;}
   canvas.addEventListener('mousedown',pd);window.addEventListener('mousemove',pm);window.addEventListener('mouseup',pu);
@@ -276,7 +330,7 @@
     stepWake(dF);
     if(!down){pvx*=0.9;pvy*=0.9;}
     if(clickWarmup>0)clickWarmup=Math.max(0,clickWarmup-dF);
-    if(down&&interactionMode==='cloud'){
+    if(down){
       holdT+=dt;lastHoldMoveT+=dt;
       const movedRecently=lastHoldMoveT<0.07;
       const triggerDist=16*viewScale;
@@ -300,6 +354,12 @@
         injectCloudEvent(cx,cy,{count:2,spread});
         holdDist=0;lastBirthT=ts;
       }
+    }else if(_userHasInteracted){
+      _emptyFrames++;
+      if(samplingPoints.length===0&&_emptyFrames>60){
+        _emptyFrames=0;
+        injectCloudEvent(viewW*0.5,viewH*0.5,{count:3,spread:CC.clickSpread*0.7*viewScale});
+      }
     }
     const deadGids=new Set();
     const bMul=viewScale;
@@ -318,7 +378,8 @@
       const dl=Math.max(0,gg.divergence)*DIV_LOSS_SCALE;
       const sl=Math.min(SHEAR_LOSS_CAP,gg.shear*SHEAR_LOSS_SCALE);
       const tl=Math.min(TOTAL_LOSS_CAP,dl+sl);
-      gr.densityFactor=(gr.densityFactor===undefined?1:gr.densityFactor)*(1-tl-CC.passiveDecay);
+      const passiveLoss=gr._preset?0:CC.passiveDecay;
+      gr.densityFactor=(gr.densityFactor===undefined?1:gr.densityFactor)*(1-tl-passiveLoss);
       if(gr.densityFactor<CC.densityDieAt||gr.cx<-300||gr.cx>viewW+300||gr.cy<-300||gr.cy>viewH+300){deadGids.add(gr.id);groupById.delete(gr.id);cloudGroups.splice(gi,1);}
     }
     for(let i=samplingPoints.length-1;i>=0;i--){
@@ -331,10 +392,10 @@
       s.stretchAmount=0;
       const gvl=Math.hypot(grp.vx,grp.vy);
       if(gvl>0.02)s.stretchAngle=Math.atan2(grp.vy,grp.vx);
-      s.curScale=(CC.blobScaleBase+s.rScale*CC.blobScaleSpan)*bMul;
+      s.curScale=(s._presetScaleBase??(CC.blobScaleBase+s.rScale*CC.blobScaleSpan))*bMul;
       const effDen=grp.densityFactor*s.density;
       const dFade=effDen<0.05?effDen/0.05:1;
-      s.baseAlpha=(CC.baseAlphaMin+s.rAlpha*CC.baseAlphaSpan)*(0.5+effDen*0.5);
+      s.baseAlpha=(s._presetAlphaBase??(CC.baseAlphaMin+s.rAlpha*CC.baseAlphaSpan))*(0.5+effDen*0.5);
       s.alpha=s.baseAlpha*dFade*(1+Math.sin((s.x*0.00019+s.y*0.00021)+s.breathSeed+cT*s.breathFreq)*0.12);
     }
     lE();
@@ -352,7 +413,8 @@
     for(let i=0;i<list.length;i++){
       const s=list[i];
       if(s.alpha<0.0003)continue;
-      const tw=s.tex.width*s.curScale,th=s.tex.height*s.curScale*s.squishY;
+      const sq=s._presetSquishY??s.squishY;
+      const tw=s.tex.width*s.curScale,th=s.tex.height*s.curScale*sq;
       ctx.save();
       ctx.translate(s.x,s.y);
       if(s.stretchAmount>0.01){ctx.rotate(s.stretchAngle);ctx.scale(1+s.stretchAmount,1-s.stretchAmount*0.3);}
@@ -362,6 +424,54 @@
       ctx.restore();
     }
   }
+  const tuneDefs = [
+    {group:'生成', items:[
+      {key:'clickCount', label:'粒子数量', min:3, max:30, step:1},
+      {key:'clickSpread', label:'云团半径', min:20, max:150, step:1},
+      {key:'blobScaleBase', label:'墨团最小', min:0.02, max:0.3, step:0.01},
+      {key:'blobScaleSpan', label:'墨团变化', min:0.05, max:0.5, step:0.01},
+      {key:'baseAlphaMin', label:'透明最小', min:0.05, max:0.6, step:0.01},
+      {key:'baseAlphaSpan', label:'透明变化', min:0.05, max:0.6, step:0.01},
+    ]},
+    {group:'运动', items:[
+      {key:'groupSpdMin', label:'初速最小', min:0, max:0.1, step:0.001},
+      {key:'groupSpdSpan', label:'初速变化', min:0, max:0.1, step:0.001},
+      {key:'groupVelMax', label:'最大速度', min:0.1, max:3, step:0.05},
+      {key:'groupDamping', label:'阻尼系数', min:0.9, max:1, step:0.001},
+      {key:'driftAngJitter', label:'漂移抖动', min:0, max:0.2, step:0.005},
+      {key:'driftSpdMul', label:'漂移系数', min:0, max:1, step:0.05},
+      {key:'fieldVelMul', label:'风场耦合', min:0, max:1, step:0.05},
+    ]},
+    {group:'手指推动', items:[
+      {key:'pushRadius', label:'推力半径', min:50, max:400, step:10},
+      {key:'pushMagMax', label:'推力上限', min:0.01, max:1, step:0.01},
+      {key:'pushMagCoef', label:'推力系数', min:0.01, max:0.3, step:0.005},
+      {key:'wakeStrength', label:'Wake强度', min:0, max:1, step:0.01},
+    ]},
+    {group:'消散', items:[
+      {key:'passiveDecay', label:'自然消散', min:0, max:0.02, step:0.0005},
+      {key:'densityDieAt', label:'消散阈值', min:0.005, max:0.3, step:0.005},
+    ]},
+  ];
+  const tunePanel=document.getElementById('tunePanel'),tuneBody=document.getElementById('tuneBody');
+  const tuneToggle=document.getElementById('tuneToggle'),tuneClose=document.getElementById('tuneClose');
+  if(tuneToggle&&tunePanel)tuneToggle.addEventListener('click',()=>{tunePanel.classList.toggle('open')});
+  if(tuneClose&&tunePanel)tuneClose.addEventListener('click',()=>{tunePanel.classList.remove('open')});
+  if(tuneBody){
+    for(const tg of tuneDefs){
+      const gd=document.createElement('div');gd.className='tune-group';
+      const gt=document.createElement('div');gt.className='tune-group-title';gt.textContent=tg.group;gd.appendChild(gt);
+      for(const it of tg.items){
+        const row=document.createElement('div');row.className='tune-row';
+        const lb=document.createElement('label');lb.textContent=it.label;
+        const sl=document.createElement('input');sl.type='range';sl.min=it.min;sl.max=it.max;sl.step=it.step;sl.value=CC[it.key];
+        const va=document.createElement('span');va.className='tune-val';va.textContent=(+CC[it.key]).toFixed(it.step<0.1?3:2);
+        sl.addEventListener('input',()=>{CC[it.key]=parseFloat(sl.value);va.textContent=(+CC[it.key]).toFixed(it.step<0.1?3:2);});
+        row.appendChild(lb);row.appendChild(sl);row.appendChild(va);gd.appendChild(row);
+      }
+      tuneBody.appendChild(gd);
+    }
+  }
   window.__dbg={samplingPoints,canvas,sCurl,sWind,sV,sVG,fC,expM,CC,viewScale:()=>viewScale};
   function takeScreenshot(){
     const s=new Date(),y=s.getFullYear(),m=String(s.getMonth()+1).padStart(2,'0'),d=String(s.getDate()).padStart(2,'0'),
@@ -369,21 +479,24 @@
       fn=`云境留影_${y}${m}${d}_${h}${mi}${se}.png`;
     try{
       const u=canvas.toDataURL('image/png');
+      // 方案1：<a download> 静默下载（本地浏览器有效，IDE 预览忽略）
       const a=document.createElement('a');a.href=u;a.download=fn;
-      document.body.appendChild(a);a.click();document.body.removeChild(a);
+      a.style.display='none';document.body.appendChild(a);a.click();document.body.removeChild(a);
+      // 方案2：同时在新标签页打开，支持 IDE 预览且可右键保存
+      window.open(u,'_blank');
     }catch(e){console.warn('[留影] 导出失败：',e);}
   }
   window.takeScreenshot=takeScreenshot;
-  const btnCloud=document.getElementById('modeCloud'),btnDrag=document.getElementById('modeDrag');
-  if(btnCloud)btnCloud.addEventListener('click',()=>{interactionMode='cloud';btnCloud.classList.add('active');if(btnDrag)btnDrag.classList.remove('active');});
-  if(btnDrag)btnDrag.addEventListener('click',()=>{interactionMode='drag';btnDrag.classList.add('active');if(btnCloud)btnCloud.classList.remove('active');});
+  const btnCloud=document.getElementById('modeCloud');
+  if(btnCloud)btnCloud.classList.add('active');
   const bgUploader=document.getElementById('bgUploader');
-  if(bgUploader)bgUploader.addEventListener('change',(e)=>{const f=e.target.files[0];if(!f)return;const url=URL.createObjectURL(f);const img=new Image();img.onload=()=>{const sc=Math.min(viewW/img.naturalWidth,viewH/img.naturalHeight)*0.92;window._bgSet({url,scale:sc,dx:0,dy:0});};img.src=url;});
+  if(bgUploader)bgUploader.addEventListener('change',(e)=>{const f=e.target.files[0];if(!f)return;_userHasInteracted=true;const url=URL.createObjectURL(f);const img=new Image();img.onload=()=>{const sc=Math.min(viewW/img.naturalWidth,viewH/img.naturalHeight)*0.92;window._bgSet({url,scale:sc,dx:0,dy:0});};img.src=url;});
   const clearBtn=document.getElementById('clearBtn');
   if(clearBtn)clearBtn.addEventListener('click',()=>{samplingPoints.length=0;cloudGroups.length=0;groupById.clear();});
   const snapBtn=document.getElementById('snapBtn');
   if(snapBtn)snapBtn.addEventListener('click',takeScreenshot);
   resizeCanvas();lTS=performance.now();
+  loadDefaultHero();
   function f(ts){uR(ts);requestAnimationFrame(f);}
   requestAnimationFrame(f);
 })();
