@@ -165,9 +165,12 @@
   const srand = s => m32((s*2654435761)>>>0);
   function gauss(r,s){return Math.exp(-r*r/(2*s*s))}
   function injectCloudEvent(cx,cy,opt){
-    const n = opt?.count??12, sp = opt?.spread??40, sb = opt?.scaleBias??1;
+    const n = (opt && opt.count != null) ? opt.count : 12;
+    const sp = (opt && opt.spread != null) ? opt.spread : 40;
+    const sb = (opt && opt.scaleBias != null) ? opt.scaleBias : 1;
     const seed = (Date.now()^(cx*73856093)^(cy*19349663))>>>0; const rnd = srand(seed);
-    const injectVx=opt?.vx??0, injectVy=opt?.vy??0;
+    const injectVx = (opt && opt.vx != null) ? opt.vx : 0;
+    const injectVy = (opt && opt.vy != null) ? opt.vy : 0;
     const hasInject=injectVx!==0||injectVy!==0;
     const groupAng=rnd()*Math.PI*2, groupSpd=CC.groupSpdMin+rnd()*CC.groupSpdSpan;
     const gvx=hasInject?injectVx:Math.cos(groupAng)*groupSpd;
@@ -180,19 +183,28 @@
       driftAng:groupDriftAng,driftSpd:groupDriftSpd,
       birthFrame:globalFrameCounter,count:n
     };
-    if(opt?.preset) grp._preset = true;
+    if(opt && opt.preset) grp._preset = true;
     cloudGroups.push(grp);
     groupById.set(gid,grp);
     const baseMul = viewScale * sb;
+    var pbsbDef=(opt && opt.presetBlobScaleBase != null)?opt.presetBlobScaleBase:0.35;
+    var pbssDef=(opt && opt.presetBlobScaleSpan != null)?opt.presetBlobScaleSpan:0.20;
+    var pamDef=(opt && opt.presetAlphaMin != null)?opt.presetAlphaMin:0.40;
+    var pasDef=(opt && opt.presetAlphaSpan != null)?opt.presetAlphaSpan:0.15;
+    var psymDef=(opt && opt.presetSquishYMin != null)?opt.presetSquishYMin:0.55;
+    var psysDef=(opt && opt.presetSquishYSpan != null)?opt.presetSquishYSpan:0.20;
     for (let i=0;i<n;i++){
       const t1=rnd(),t2=rnd(),r=Math.sqrt(t1)*sp,th=t2*Math.PI*2,dx=Math.cos(th)*r,dy=Math.sin(th)*r;
       const sdensity = gauss(r,sp*0.55), x=cx+dx, y=cy+dy;
       const rScale=rnd(), rAlpha=rnd();
       const bs=(CC.blobScaleBase+rScale*CC.blobScaleSpan)*baseMul, ba=(CC.baseAlphaMin+rAlpha*CC.baseAlphaSpan)*(0.5+sdensity*0.5);
+      var preSC = (opt && opt.preset) ? (pbsbDef + rScale*pbssDef) : undefined;
+      var preAL = (opt && opt.preset) ? (pamDef + rAlpha*pasDef) : undefined;
+      var preSQ = (opt && opt.preset) ? (psymDef + rnd()*psysDef) : undefined;
       samplingPoints.push({groupId:gid,relX:dx,relY:dy,x,y,rot:rnd()*Math.PI*2,rotSpeed:(rnd()-0.5)*0.004,scale:bs,curScale:bs,baseAlpha:ba,density:sdensity,tex:INK_TEXTURES[(seed+i)%8],depth:rnd(),stretchAmount:0,stretchAngle:0,breathSeed:rnd()*Math.PI*2,breathFreq:0.3+rnd()*0.8,squishY:0.78+rnd()*0.42,birthFrame:globalFrameCounter,rScale,rAlpha,_baseMul:baseMul,
-        _presetScaleBase:(opt?.preset?((opt.presetBlobScaleBase??0.35)+rScale*(opt.presetBlobScaleSpan??0.20)):undefined),
-        _presetAlphaBase:(opt?.preset?((opt.presetAlphaMin??0.40)+rAlpha*(opt.presetAlphaSpan??0.15)):undefined),
-        _presetSquishY:(opt?.preset?(opt.presetSquishYMin??0.35)+rnd()*(opt.presetSquishYSpan??0.20):undefined)
+        _presetScaleBase:preSC,
+        _presetAlphaBase:preAL,
+        _presetSquishY:preSQ
       });
     }
     while(samplingPoints.length>MAX_COUNT_HARD){const i=((globalFrameCounter*13)>>>0)%samplingPoints.length;releaseSamplingPoint(i);}
@@ -392,10 +404,10 @@
       s.stretchAmount=0;
       const gvl=Math.hypot(grp.vx,grp.vy);
       if(gvl>0.02)s.stretchAngle=Math.atan2(grp.vy,grp.vx);
-      s.curScale=(s._presetScaleBase??(CC.blobScaleBase+s.rScale*CC.blobScaleSpan))*bMul;
+      s.curScale=(s._presetScaleBase != null ? s._presetScaleBase : (CC.blobScaleBase+s.rScale*CC.blobScaleSpan))*bMul;
       const effDen=grp.densityFactor*s.density;
       const dFade=effDen<0.05?effDen/0.05:1;
-      s.baseAlpha=(s._presetAlphaBase??(CC.baseAlphaMin+s.rAlpha*CC.baseAlphaSpan))*(0.5+effDen*0.5);
+      s.baseAlpha=(s._presetAlphaBase != null ? s._presetAlphaBase : (CC.baseAlphaMin+s.rAlpha*CC.baseAlphaSpan))*(0.5+effDen*0.5);
       s.alpha=s.baseAlpha*dFade*(1+Math.sin((s.x*0.00019+s.y*0.00021)+s.breathSeed+cT*s.breathFreq)*0.12);
     }
     lE();
@@ -413,7 +425,7 @@
     for(let i=0;i<list.length;i++){
       const s=list[i];
       if(s.alpha<0.0003)continue;
-      const sq=s._presetSquishY??s.squishY;
+      const sq=s._presetSquishY != null ? s._presetSquishY : s.squishY;
       const tw=s.tex.width*s.curScale,th=s.tex.height*s.curScale*sq;
       ctx.save();
       ctx.translate(s.x,s.y);
