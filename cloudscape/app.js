@@ -83,28 +83,36 @@
     //     sm : 扩散半径倍数 (CC.clickSpread=34 * sm = 散布范围，越大越散)
     //     vx,vy : 初始漂移速度 (正=右/下，负=左/上)
     const puffs = [
-      {x:0.18,y:0.10,c:18,sm:1.5,vx:0.008,vy:-0.004},  // 上-左
-      {x:0.35,y:0.30,c:7, sm:1.3,vx:-0.006,vy:-0.003}, // 上-中
-      {x:0.68,y:0.20,c:12,sm:1.1,vx:-0.005,vy:-0.001}, // 上-右
+      {x:0.30,y:0.16,c:18,sm:1.5,vx:0.008,vy:-0.004},  // 上-左（最大云：构图锚点，紧凑簇左）
+      {x:0.42,y:0.22,c:7, sm:1.3,vx:-0.006,vy:-0.003}, // 上-中（簇中心）
+      {x:0.52,y:0.15,c:12,sm:1.1,vx:-0.005,vy:-0.001}, // 上-右（簇右，与上左/上中呼应）
       {x:0.23,y:0.54,c:7, sm:2.2,vx:0.005,vy:-0.012},  // 下-左
       {x:0.39,y:0.60,c:5, sm:1.9,vx:0.003,vy:-0.010},  // 下-中
       {x:0.46,y:0.52,c:10,sm:1.7,vx:-0.002,vy:-0.009}, // 下-右
     ];
-    for(const p of puffs){
-      const cx = viewW * p.x, cy = viewH * p.y, spread = baseSp * p.sm;
+    // 上方三朵允许轻微位置/尺寸变化；下方三朵保持初始化位置不动
+    // 最大云（左上，idx===0）始终维持最大视觉重量，作为构图锚点
+    for (let idx=0; idx<puffs.length; idx++){
+      const p = puffs[idx];
+      const isTop = idx < 3;          // 上方三朵：允许轻微位置/尺寸变化
+      const isMax = idx === 0;        // 最大云（左上）：构图锚点，恒在左上、保持最大视觉重量
+      let smJ = 1, px = p.x, py = p.y;
+      if (isTop){
+        px += (Math.random()*2-1)*0.02;
+        py += (Math.random()*2-1)*0.02;
+        // 三朵都允许轻微 scale 变化；最大云幅度更小(±2~4%)，另两朵稍大(±4~8%)
+        // 约束：最大云始终维持最大视觉重量（c:18 已最大，scale 仍略偏增）
+        const amt = isMax ? (0.02+Math.random()*0.02) : (0.04+Math.random()*0.04);
+        smJ = 1 + (isMax ? Math.abs(Math.random()*0.04) : (Math.random()*2-1)*amt); // 最大云只增不减
+      }
+      const cx = viewW * px, cy = viewH * py, spread = baseSp * p.sm * smJ;
       injectCloudEvent(cx,cy,{count:p.c,spread,vx:p.vx,vy:p.vy,
         preset:true,
-        // ── 以下只对预制云生效，不影响点击云 ──
-        //   最终墨团缩放 = (presetBlobScaleBase + 随机×presetBlobScaleSpan) × viewScale
-        //   值越大墨团越大。默认点击云：0.19 + 随机×0.24 = 0.19~0.43
         presetBlobScaleBase:0.35, presetBlobScaleSpan:0.20,
-        //   最终透明度 = (presetAlphaMin + 随机×presetAlphaSpan) × 密度系数
-        //   值越大越不透明。默认点击云：0.06~0.11（几乎不可见）
         presetAlphaMin:0.40, presetAlphaSpan:0.15,
-        //   squishY 控制扁度：值越小越扁 (宽>高)
-        //   默认 0.78~1.20 (随机；0.78=微扁，1.0=正圆，>1.0=竖长)
-        //   预制云设为 0.55~0.75 → 明显宽扁，若太扁显棱角可调高
-        presetSquishYMin:0.55, presetSquishYSpan:0.20,
+        presetSquishYMin:0.55, presetSquishYSpan:0.18,
+        presetSpreadX:1.6,
+        presetRotFixed:true,
       });
     }
   }
@@ -193,18 +201,29 @@
     var pasDef=(opt && opt.presetAlphaSpan != null)?opt.presetAlphaSpan:0.15;
     var psymDef=(opt && opt.presetSquishYMin != null)?opt.presetSquishYMin:0.55;
     var psysDef=(opt && opt.presetSquishYSpan != null)?opt.presetSquishYSpan:0.20;
+    var psxmDef=(opt && opt.presetStretchXMin != null)?opt.presetStretchXMin:1.0;
+    var psxsDef=(opt && opt.presetStretchXSpan != null)?opt.presetStretchXSpan:0.0;
+    var pspxDef=(opt && opt.presetSpreadX != null)?opt.presetSpreadX:1.0;
+    var prtF=(opt && opt.presetRotFixed) ? true : false;
     for (let i=0;i<n;i++){
-      const t1=rnd(),t2=rnd(),r=Math.sqrt(t1)*sp,th=t2*Math.PI*2,dx=Math.cos(th)*r,dy=Math.sin(th)*r;
+      let dx,dy,r=0;
+      const t1=rnd(),t2=rnd(); r=Math.sqrt(t1)*sp; const th=t2*Math.PI*2;
+      dx=Math.cos(th)*r*pspxDef; dy=Math.sin(th)*r;
       const sdensity = gauss(r,sp*0.55), x=cx+dx, y=cy+dy;
       const rScale=rnd(), rAlpha=rnd();
       const bs=(CC.blobScaleBase+rScale*CC.blobScaleSpan)*baseMul, ba=(CC.baseAlphaMin+rAlpha*CC.baseAlphaSpan)*(0.5+sdensity*0.5);
       var preSC = (opt && opt.preset) ? (pbsbDef + rScale*pbssDef) : undefined;
       var preAL = (opt && opt.preset) ? (pamDef + rAlpha*pasDef) : undefined;
       var preSQ = (opt && opt.preset) ? (psymDef + rnd()*psysDef) : undefined;
-      samplingPoints.push({groupId:gid,relX:dx,relY:dy,x,y,rot:rnd()*Math.PI*2,rotSpeed:(rnd()-0.5)*0.004,scale:bs,curScale:bs,baseAlpha:ba,density:sdensity,tex:INK_TEXTURES[(seed+i)%8],depth:rnd(),stretchAmount:0,stretchAngle:0,breathSeed:rnd()*Math.PI*2,breathFreq:0.3+rnd()*0.8,squishY:0.78+rnd()*0.42,birthFrame:globalFrameCounter,rScale,rAlpha,_baseMul:baseMul,
+      var preSX = (opt && opt.preset) ? (psxmDef + rnd()*psxsDef) : undefined;
+      // 形状云：粒子在形状内出生，但材质/渲染完全复用现有墨团（虚实与普通云一致）
+      const preRot = (opt && opt.preset && prtF) ? 0 : rnd()*Math.PI*2;
+      const preRotSpd = (opt && opt.preset && prtF) ? 0 : (rnd()-0.5)*0.004;
+      samplingPoints.push({groupId:gid,relX:dx,relY:dy,x,y,rot:preRot,rotSpeed:preRotSpd,scale:bs,curScale:bs,baseAlpha:ba,density:sdensity,tex:INK_TEXTURES[(seed+i)%8],depth:rnd(),stretchAmount:0,stretchAngle:0,breathSeed:rnd()*Math.PI*2,breathFreq:0.3+rnd()*0.8,squishY:0.78+rnd()*0.42,birthFrame:globalFrameCounter,rScale,rAlpha,_baseMul:baseMul,
         _presetScaleBase:preSC,
         _presetAlphaBase:preAL,
-        _presetSquishY:preSQ
+        _presetSquishY:preSQ,
+        _presetStretchX:preSX
       });
     }
     while(samplingPoints.length>MAX_COUNT_HARD){const i=((globalFrameCounter*13)>>>0)%samplingPoints.length;releaseSamplingPoint(i);}
@@ -426,7 +445,8 @@
       const s=list[i];
       if(s.alpha<0.0003)continue;
       const sq=s._presetSquishY != null ? s._presetSquishY : s.squishY;
-      const tw=s.tex.width*s.curScale,th=s.tex.height*s.curScale*sq;
+      const sx=s._presetStretchX != null ? s._presetStretchX : 1.0;
+      const tw=s.tex.width*s.curScale*sx,th=s.tex.height*s.curScale*sq;
       ctx.save();
       ctx.translate(s.x,s.y);
       if(s.stretchAmount>0.01){ctx.rotate(s.stretchAngle);ctx.scale(1+s.stretchAmount,1-s.stretchAmount*0.3);}
