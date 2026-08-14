@@ -870,7 +870,7 @@
   [0.1261,-0.1256,0.1996,0.1534,0.9305,5,0.6468,3.698,0.366],
   [0.1198,-0.1185,0.3864,0.1948,0.9219,6,0.7774,4.319,0.65],
   [0.0581,-0.1748,0.2059,0.1847,1.0312,7,2.4524,1.544,0.537],
-  [0.1015,-0.1197,0.4087,0.1872,0,5.7557,5.146,0.975],
+  [0.1015,-0.1197,0.4087,0.1872,1.0,5,5.7557,5.146,0.975],
   [0.0256,-0.0047,0.3427,0.2125,1.0916,7,4.3547,2.469,0.839],
   [-0.0034,-0.0631,0.4069,0.2193,1.1144,0,1.7597,1.495,0.959],
   [-0.0413,0.0066,0.3758,0.2338,0.8416,1,4.4961,0.527,0.873],
@@ -1221,7 +1221,7 @@
       const scaleBase = ps * (sizePx / REF_BW) / viewScale;
       samplingPoints.push({groupId:gid,relX:dx*sizePx,relY:dy*sizePx,x:cx+dx*sizePx,y:cy+dy*sizePx,
         rot:r,rotSpeed:0,scale:scaleBase,curScale:scaleBase,baseAlpha:pa,density:1,
-        tex:INK_TEXTURES[((t%8)+8)%8],depth:Math.random(),stretchAmount:0,stretchAngle:0,
+        tex:INK_TEXTURES[Math.floor(((t%8)+8)%8)] || INK_TEXTURES[0],depth:Math.random(),stretchAmount:0,stretchAngle:0,
         breathSeed:bs,breathFreq:bf,squishY:pq,birthFrame:globalFrameCounter,
         rScale:0,rAlpha:0,_baseMul:viewScale,
         _presetScaleBase:scaleBase,_presetAlphaBase:pa,_presetSquishY:pq,_presetStretchX:1});
@@ -1338,7 +1338,7 @@
       // 形状云：粒子在形状内出生，但材质/渲染完全复用现有墨团（虚实与普通云一致）
       const preRot = (opt && opt.preset && prtF) ? 0 : rnd()*Math.PI*2;
       const preRotSpd = (opt && opt.preset && prtF) ? 0 : (rnd()-0.5)*0.004;
-      samplingPoints.push({groupId:gid,relX:dx,relY:dy,x,y,rot:preRot,rotSpeed:preRotSpd,scale:bs,curScale:bs,baseAlpha:ba,density:sdensity,tex:INK_TEXTURES[(seed+i)%8],depth:rnd(),stretchAmount:0,stretchAngle:0,breathSeed:rnd()*Math.PI*2,breathFreq:0.3+rnd()*0.8,squishY:0.78+rnd()*0.42,birthFrame:globalFrameCounter,rScale,rAlpha,_baseMul:baseMul,
+      samplingPoints.push({groupId:gid,relX:dx,relY:dy,x,y,rot:preRot,rotSpeed:preRotSpd,scale:bs,curScale:bs,baseAlpha:ba,density:sdensity,tex:INK_TEXTURES[Math.floor(((seed+i)%8)+8)%8] || INK_TEXTURES[0],depth:rnd(),stretchAmount:0,stretchAngle:0,breathSeed:rnd()*Math.PI*2,breathFreq:0.3+rnd()*0.8,squishY:0.78+rnd()*0.42,birthFrame:globalFrameCounter,rScale,rAlpha,_baseMul:baseMul,
         _presetScaleBase:preSC,
         _presetAlphaBase:preAL,
         _presetSquishY:preSQ,
@@ -1563,7 +1563,7 @@
     ctx.globalCompositeOperation='screen';
     for(let i=0;i<list.length;i++){
       const s=list[i];
-      if(s.alpha<0.0003)continue;
+      if(!s.tex||s.alpha<0.0003)continue;
       const sq=s._presetSquishY != null ? s._presetSquishY : s.squishY;
       const sx=s._presetStretchX != null ? s._presetStretchX : 1.0;
       const tw=256*s.curScale*sx,th=256*s.curScale*sq;
